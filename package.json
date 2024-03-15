@@ -1,0 +1,23 @@
+{
+    "name": "op-tasks",
+    "version": "1.0.50",
+    "private": true,
+    "maintainers": [
+        "Reyhan Kamil"
+    ],
+    "scripts": {
+        "bin": "bun build --compile --minify --sourcemap src/main.ts --outfile ./tasks",
+        "dev": "bun run --hot src/main.ts"
+    },
+    "dependencies": {
+        "@elysiajs/eden": "^0.8.1",
+        "date-fns": "^3.4.0",
+        "elysia": "latest",
+        "rxjs": "^7.8.1",
+        "ulid": "^2.3.0"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    },
+    "module": "src/main.ts"
+}

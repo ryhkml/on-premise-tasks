@@ -1,0 +1,8 @@
+node_modules/
+
+.vscode/
+
+docker-compose*
+cosign*
+
+note.txt
