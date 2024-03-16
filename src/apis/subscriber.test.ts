@@ -11,107 +11,257 @@ const app = subscriber.listen(port);
 const api = edenFetch<typeof app>("http://localhost:" + port);
 const db = new Database(env.PATH_SQLITE);
 
-describe("Path subscribers", () => {
-    it("should contain path /subscribers/:v", () => {
-        const path = subscriber.routes.map(item => item.path);
-        expect(path).toContain("/subscribers/:v");
+describe("API GET /subscribers/:name", async () => {
+    const name = "test-get";
+    beforeEach(() => {
+        db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
     });
-});
-describe("API /subscriber/:v", async () => {
-    const username = "guest1";
     afterEach(() => {
-        db.run("DELETE FROM subscriber WHERE username = ?1;", [username]);
+        db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
     });
     it("should successful get subscriber", async () => {
         const credential = await api("/subscriber", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: {
-                username,
-                requestAt: Date.now()
+                name
             }
         });
-        const subsciber = await api("/subscribers/:v", {
+        const { data, status } = await api("/subscribers/:name", {
+            method: "GET",
             headers: {
-                "authorization": "Bearer " + credential.data?.key!,
-                "x-tasks-subsciber-id": credential.data?.id!
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + credential.data?.key!,
+                "X-Tasks-Subscriber-Id": credential.data?.id!
             },
             params: {
-                v: username
+                name
             }
         });
-        expect(subsciber.status).toBe(200);
-        expect(subsciber.data).toHaveProperty("id");
-        expect(subsciber.data).toHaveProperty("username");
-        expect(subsciber.data).toHaveProperty("createdAt");
-        expect(subsciber.data).toHaveProperty("tasksInQueue");
-        expect(subsciber.data).toHaveProperty("tasksInQueueLimit");
+        expect(status).toBe(200);
+        expect(data).toHaveProperty("subscriberId");
+        expect(data).toHaveProperty("subscriberName");
+        expect(data).toHaveProperty("createdAt");
+        expect(data).toHaveProperty("tasksInQueue");
+        expect(data).toHaveProperty("tasksInQueueLimit");
     });
-    it("should respond with 404 if subscriber not found", async () => {
+    it("should respond 400 if subscriber id does not match subscriber name", async () => {
         const credential = await api("/subscriber", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: {
-                username,
-                requestAt: Date.now()
+                name
             }
         });
-        const subsciber = await api("/subscribers/:v", {
+        const { status } = await api("/subscribers/:name", {
+            method: "GET",
             headers: {
-                "authorization": "Bearer " + credential.data?.key!,
-                "x-tasks-subsciber-id": credential.data?.id!
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + credential.data?.key!,
+                "X-Tasks-Subscriber-Id": credential.data?.id!
             },
             params: {
-                v: "dummy"
+                name: "dummy"
             }
         });
-        expect(subsciber.status).toBe(404);
+        expect(status).toBe(400);
+    });
+    it("should respond 401 if subscriber id is invalid", async () => {
+        const credential = await api("/subscriber", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: {
+                name
+            }
+        });
+        const subsciber = await api("/subscribers/:name", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + credential.data?.key!,
+                "X-Tasks-Subscriber-Id": "dummy"
+            },
+            params: {
+                name
+            }
+        });
+        expect(subsciber.status).toBe(401);
+    });
+    it("should respond 403 if subscriber key is invalid", async () => {
+        const credential = await api("/subscriber", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: {
+                name
+            }
+        });
+        const subsciber = await api("/subscribers/:name", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer dummy",
+                "X-Tasks-Subscriber-Id": credential.data?.id!
+            },
+            params: {
+                name
+            }
+        });
+        expect(subsciber.status).toBe(403);
     });
 });
 
-describe("Path subscriber", () => {
-    it("should contain path /subscriber", () => {
-        const path = subscriber.routes.map(item => item.path);
-        expect(path).toContain("/subscriber");
-    });
-});
-describe("API /subscriber", () => {
-    const username = "guest2";
+describe("API POST /subscriber", () => {
+    const name = "test-post";
     beforeEach(() => {
-        db.run("DELETE FROM subscriber WHERE username = ?1;", [username]);
+        db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
     });
     afterEach(() => {
-        db.run("DELETE FROM subscriber WHERE username = ?1;", [username]);
+        db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
     });
-    it("should successful registration", async () => {
-        const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE username = @username);");
-        const obj = q.get({ "@username": username }) as { [k: string]: number };
-        const notExists = !!Object.values(obj)[0];
-        expect(notExists).toBeFalsy();
+    it("should successful register subscriber", async () => {
+        const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?);");
+        const obj = q.get(name) as { [k: string]: number };
+        const isExists = !!Object.values(obj)[0];
+        expect(isExists).toBeFalsy();
         const { data, status } = await api("/subscriber", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: {
-                username,
-                requestAt: Date.now()
+                name
             }
         });
         expect(status).toBe(201);
         expect(data).toHaveProperty("id");
         expect(data).toHaveProperty("key");
     });
-    it("should respond with 409 if subscriber already registered", async () => {
+    it("should respond 409 if subscriber already registered", async () => {
         await api("/subscriber", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: {
-                username,
-                requestAt: Date.now()
+                name
             }
         });
         const { status } = await api("/subscriber", {
             method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: {
-                username,
-                requestAt: Date.now()
+                name
             }
         });
         expect(status).toBe(409);
+    });
+});
+
+describe("API DELETE /subscribers/:name", () => {
+    const name = "test-delete";
+    beforeEach(() => {
+        db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
+    });
+    afterEach(() => {
+        db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
+    });
+    it("should successful delete subscriber", async () => {
+        const credential = await api("/subscriber", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: {
+                name
+            }
+        });
+        const { status } = await api("/subscribers/:name", {
+            method: "DELETE",
+            headers: {
+                "Authorization": "Bearer " + credential.data?.key!,
+                "X-Tasks-Subscriber-Id": credential.data?.id!
+            },
+            params: {
+                name
+            }
+        });
+        expect(status).toBe(200);
+    });
+    it("should respond 400 if tasksInQueue subscriber greater than or equal to 1", async () => {
+        const credential = await api("/subscriber", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: {
+                name
+            }
+        });
+        db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberName = ?;", [name]);
+        const { status } = await api("/subscribers/:name", {
+            method: "DELETE",
+            headers: {
+                "Authorization": "Bearer " + credential.data?.key!,
+                "X-Tasks-Subscriber-Id": credential.data?.id!
+            },
+            params: {
+                name
+            }
+        });
+        expect(status).toBe(400);
+    });
+    it("should respond 401 if subscriber id is invalid", async () => {
+        const credential = await api("/subscriber", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: {
+                name
+            }
+        });
+        const subsciber = await api("/subscribers/:name", {
+            method: "DELETE",
+            headers: {
+                "Authorization": "Bearer " + credential.data?.key!,
+                "X-Tasks-Subscriber-Id": "dummy"
+            },
+            params: {
+                name
+            }
+        });
+        expect(subsciber.status).toBe(401);
+    });
+    it("should respond 403 if subscriber key is invalid", async () => {
+        const credential = await api("/subscriber", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: {
+                name
+            }
+        });
+        const subsciber = await api("/subscribers/:name", {
+            method: "DELETE",
+            headers: {
+                "Authorization": "Bearer dummy",
+                "X-Tasks-Subscriber-Id": credential.data?.id!
+            },
+            params: {
+                name
+            }
+        });
+        expect(subsciber.status).toBe(403);
     });
 });

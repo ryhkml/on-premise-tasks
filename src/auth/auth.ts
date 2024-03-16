@@ -3,46 +3,37 @@ import { Database } from "bun:sqlite";
 
 import { Context } from "elysia";
 
-import { SubscriberContext } from "../apis/subscriber";
+import { HttpException } from "../exception/http-exception";
 
-export const isValidSubscriber = async (ctx: Context) => {
-    const reqId = ctx.request.headers.get("x-tasks-subsciber-id");
-    const bearer = ctx.request.headers.get("authorization");
-    if (reqId == null || bearer == null) {
+interface AuthContext extends Context {
+    id: string;
+    key: string;
+    requestAt: number;
+}
+
+export async function isValidSubscriber(ctx: AuthContext) {
+    if (ctx.id == "" || ctx.key == "") {
         ctx.set.status = "Unauthorized";
-        return {
-            message: ""
-        };
+        throw new HttpException("The request did not include valid authentication");
     }
-    const key = bearer.substring(7, bearer.length);
-    const secretKey = getSecretKey(reqId);
-    if (secretKey == null) {
+    const hashKey = getKey(ctx.id);
+    if (hashKey == null) {
         ctx.set.status = "Unauthorized";
-        return {
-            message: ""
-        };
+        throw new HttpException("The request did not include valid authentication");
     }
-    const isValid = await password.verify(key, secretKey, "argon2id");
+    const isValid = await password.verify(ctx.key, hashKey, "argon2id");
     if (!isValid) {
-        ctx.set.status = "Unauthorized";
-        return {
-            message: ""
-        };
+        ctx.set.status = "Forbidden";
+        throw new HttpException("The server did not accept valid authentication");
     }
 }
 
-const getSecretKey = (id: string) => {
-    try {
-        const db = new Database(env.PATH_SQLITE);
-        const q = db.query("SELECT secretKey FROM subscriber WHERE id = @id;");
-        const value = q.get({ "@id": id }) as Pick<SubscriberContext, "secretKey"> | null;
-        q.finalize();
-        if (value == null) {
-            return null;
-        }
-        return value.secretKey;
-    } catch (e) {
-        console.error(e);
+function getKey(id: string) {
+    const db = new Database(env.PATH_SQLITE);
+    const q = db.query("SELECT key FROM subscriber WHERE subscriberId = ?;");
+    const value = q.get(id) as Pick<SubscriberContext, "key"> | null;
+    if (value == null) {
         return null;
     }
+    return value.key;
 }
