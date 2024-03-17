@@ -45,7 +45,8 @@ package-lock.json
 **/*.bun
 
 # DB
-*.sqlite*
+db/tasks*
+db/*.db
 
 # Bin
 tasks

@@ -5,7 +5,7 @@ CREATE TABLE subscriber (
     key                 TEXT NOT NULL,
     createdAt           INTEGER NOT NULL,
     tasksInQueue        INTEGER NOT NULL DEFAULT 0,
-    tasksInQueueLimit   INTEGER NOT NULL DEFAULT 1000
+    tasksInQueueLimit   INTEGER DEFAULT 1000
 );
 
 CREATE INDEX ixSubscriberId ON subscriber (subscriberId);

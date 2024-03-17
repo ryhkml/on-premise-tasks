@@ -1,11 +1,10 @@
-import { env, password } from "bun";
+import { password } from "bun";
 import { Database } from "bun:sqlite";
 
 import { Context } from "elysia";
 
-import { HttpException } from "../exception/http-exception";
-
 interface AuthContext extends Context {
+    db: Database;
     id: string;
     key: string;
     requestAt: number;
@@ -13,23 +12,25 @@ interface AuthContext extends Context {
 
 export async function isValidSubscriber(ctx: AuthContext) {
     if (ctx.id == "" || ctx.key == "") {
-        ctx.set.status = "Unauthorized";
-        throw new HttpException("The request did not include valid authentication");
+        return ctx.error("Unauthorized", {
+            message: "The request did not include valid authentication"
+        });
     }
-    const hashKey = getKey(ctx.id);
+    const hashKey = getKey(ctx.db, ctx.id);
     if (hashKey == null) {
-        ctx.set.status = "Unauthorized";
-        throw new HttpException("The request did not include valid authentication");
+        return ctx.error("Unauthorized", {
+            message: "The request did not include valid authentication"
+        });
     }
     const isValid = await password.verify(ctx.key, hashKey, "argon2id");
     if (!isValid) {
-        ctx.set.status = "Forbidden";
-        throw new HttpException("The server did not accept valid authentication");
+        return ctx.error("Forbidden", {
+            message: "The server did not accept valid authentication"
+        });
     }
 }
 
-function getKey(id: string) {
-    const db = new Database(env.PATH_SQLITE);
+function getKey(db: Database, id: string) {
     const q = db.query("SELECT key FROM subscriber WHERE subscriberId = ?;");
     const value = q.get(id) as Pick<SubscriberContext, "key"> | null;
     if (value == null) {

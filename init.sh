@@ -6,13 +6,14 @@ bun -v
 
 cat <<EOF >.env
 TZ="UTC"
-PATH_SQLITE="./db/t.sqlite"
+PORT=
+PATH_SQLITE="./db/tasks.db"
 EOF
 
 echo ".env file created"
 
 bun install
-bun run src/db.ts
+bun init-db.ts
 bun test
 
 echo "On-Premise Tasks is ready to serve"

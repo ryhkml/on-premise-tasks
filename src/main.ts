@@ -1,12 +1,10 @@
 import { env } from "bun";
-import { Database } from "bun:sqlite";
 
 import { Elysia } from "elysia";
 import { swagger } from "@elysiajs/swagger";
+import { toString } from "lodash";
 
 import { subscriber } from "./apis/subscriber";
-
-import { HttpException } from "./exception/http-exception";
 
 const port = +env.PORT! || 3200;
 const app = new Elysia()
@@ -25,39 +23,30 @@ const app = new Elysia()
             }
         }
     }))
-    .error({
-        "HTTP_EXCEPTION": HttpException
-    })
     .onError(ctx => {
-        if (ctx.code == "HTTP_EXCEPTION") {
-            return {
-                message: ctx.error.message
-            };
-        }
         if (ctx.code == "VALIDATION") {
-            const message = JSON.parse(ctx.error.message)["message"] as string;
+            ctx.set.status = "Bad Request";
             return {
-                message
+                message: JSON.parse(ctx.error.message)["message"]
             };
         }
         if (ctx.code == "NOT_FOUND") {
-            ctx.set.status = "Not Found";
-            return null;
+            return {
+                message: "The request did not match any resource. Visit /swagger for more information"
+            };
         }
-        ctx.set.status = "Internal Server Error";
-        return {
-            message: "The server returned an error"
-        };
+        console.error("ERROR HTTP EXCEPTION:", ctx.error.message);
+        return ctx.error;
     })
     .use(subscriber)
+    .onStart(ctx => {
+        try {
+            ctx.decorator.db.exec("PRAGMA journal_mode = WAL;");
+            console.log("Database ok");
+        } catch (e) {
+            console.error("ERROR DATABASE:", toString(e));
+        }
+    })
     .listen(port);
-
-try {
-    const db = new Database(env.PATH_SQLITE);
-    db.exec("PRAGMA journal_mode = WAL;");
-    console.log("Database OK");
-} catch (e) {
-    console.error(e);
-}
 
 console.log("Server listening on port", app.server?.port);
