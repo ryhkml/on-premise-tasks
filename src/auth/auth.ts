@@ -7,7 +7,7 @@ interface AuthContext extends Context {
     db: Database;
     id: string;
     key: string;
-    requestAt: number;
+    today: number;
 }
 
 export async function isValidSubscriber(ctx: AuthContext) {

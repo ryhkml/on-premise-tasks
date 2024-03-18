@@ -7,7 +7,7 @@ import { subscriber } from "../apis/subscriber";
 import { tasksDb } from "../db";
 
 const port = +env.PORT! || 3200;
-const app = subscriber.listen(port);
+const app = subscriber().listen(port);
 const api = treaty(app);
 
 describe("Test auth", () => {
@@ -21,7 +21,7 @@ describe("Test auth", () => {
     });
     describe("select secret key", () => {
         it("should respond argon2id hash algorithm", async () => {
-            const { data, status } = await api.subscriber.post({ name });
+            const { data, status } = await api.subscribers.register.post({ name });
             const q = db.query("SELECT key FROM subscriber WHERE subscriberId = ?;");
             const secret = q.get(data?.id!) as { key: string } | null;
             expect(status).toBe(201);

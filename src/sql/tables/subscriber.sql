@@ -4,10 +4,11 @@ CREATE TABLE subscriber (
     subscriberName      TEXT UNIQUE NOT NULL,
     key                 TEXT NOT NULL,
     createdAt           INTEGER NOT NULL,
-    tasksInQueue        INTEGER NOT NULL DEFAULT 0,
-    tasksInQueueLimit   INTEGER DEFAULT 1000
+    tasksInQueue        INTEGER NOT NULL,
+    tasksInQueueLimit   INTEGER NOT NULL,
+    CHECK (tasksInQueue <= tasksInQueueLimit)
 );
 
-CREATE INDEX ixSubscriberId ON subscriber (subscriberId);
+CREATE INDEX ixSubscriberId ON subscriber(subscriberId);
 
-CREATE INDEX ixSubscriberName ON subscriber (subscriberName);
+CREATE INDEX ixSubscriberName ON subscriber(subscriberName);

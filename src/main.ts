@@ -5,6 +5,7 @@ import { swagger } from "@elysiajs/swagger";
 import { toString } from "lodash";
 
 import { subscriber } from "./apis/subscriber";
+import { subscription } from "./apis/subscription";
 
 const port = +env.PORT! || 3200;
 const app = new Elysia()
@@ -38,10 +39,12 @@ const app = new Elysia()
         console.error("ERROR HTTP EXCEPTION:", ctx.error.message);
         return ctx.error;
     })
-    .use(subscriber)
+    .use(subscriber())
+    .use(subscription())
     .onStart(ctx => {
         try {
             ctx.decorator.db.exec("PRAGMA journal_mode = WAL;");
+            ctx.decorator.db.exec("PRAGMA foreign_keys = ON;");
             console.log("Database ok");
         } catch (e) {
             console.error("ERROR DATABASE:", toString(e));

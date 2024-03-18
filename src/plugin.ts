@@ -13,7 +13,7 @@ export function pluginApi() {
                 key: auth?.startsWith("Bearer ")
                     ? auth.slice(7)
                     : "",
-                requestAt: Date.now()
+                today: Date.now()
             };
         })
         .headers({
