@@ -12,9 +12,6 @@ export function subscriber() {
     return new Elysia({ prefix: "/subscribers" })
         .use(pluginApi())
         .guard({
-            transform(ctx) {
-                ctx.params.name = deburr(ctx.params.name).trim();
-            },
             async beforeHandle(ctx) {
                 // @ts-ignore
                 return await isValidSubscriber(ctx);
@@ -124,13 +121,13 @@ export function subscriber() {
                         message: t.Literal("Done")
                     }),
                     400: t.Object({
-                        message: t.Literal("A request includes an invalid credential or value")
+                        message: t.String()
                     }),
                     401: t.Object({
-                        message: t.Literal("The request did not include valid authentication")
+                        message: t.String()
                     }),
                     403: t.Object({
-                        message: t.Literal("The server did not accept valid authentication")
+                        message: t.String()
                     })
                 }
             })
@@ -187,14 +184,18 @@ export function subscriber() {
             response: {
                 201: t.Object({
                     id: t.String(),
-                    key: t.String({
+                    key: t.Literal("t-" + t.String({
                         contentEncoding: "base64"
-                    })
+                    }))
                 }),
                 409: t.Object({
-                    message: t.Literal("Subscriber has already registered")
+                    message: t.String()
+                }),
+                500: t.Object({
+                    message: t.String()
                 })
-            }
+            },
+            type: "json"
         });
 }
 
