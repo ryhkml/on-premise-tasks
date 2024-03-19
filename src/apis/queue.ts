@@ -8,13 +8,21 @@ import { ulid } from "ulid";
 
 import { pluginApi } from "../plugin";
 import { httpRequest } from "../utils/fetch";
+import { isValidSubscriber } from "../auth/auth";
 
 export function queue() {
     return new Elysia({ prefix: "/queues" })
         .use(pluginApi())
+        .onBeforeHandle(async ctx => {
+            return await isValidSubscriber(ctx);
+        })
         .state("queues", [] as Array<SafeQueue>)
         .guard({
-
+            params: t.Object({
+                id: t.String({
+                    default: null
+                })
+            })
         }, api => api
             .get("/:id", ctx => {
 
