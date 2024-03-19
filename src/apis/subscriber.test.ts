@@ -4,14 +4,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { treaty } from "@elysiajs/eden";
 
 import { subscriber } from "./subscriber";
-import { tasksDb } from "../db";
 
 const port = +env.PORT! || 3200;
 const app = subscriber().listen(port);
 const api = treaty(app);
+const db = app.decorator.db;
 
 describe("Test API", () => {
-    const db = tasksDb();
     beforeAll(() => {
         db.exec("PRAGMA journal_mode = WAL;");
     });
@@ -70,7 +69,7 @@ describe("Test API", () => {
         });
     });
     
-    describe("POST /subscriber", () => {
+    describe("POST /subscribers/register", () => {
         const name = "test-post-subscriber";
         beforeEach(() => {
             db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);

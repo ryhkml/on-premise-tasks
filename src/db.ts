@@ -4,11 +4,15 @@ import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 
 export function tasksDb() {
-    if (env.PATH_SQLITE == null) {
+    let path = env.PATH_SQLITE;
+    if (env.LEVEL == "DEV") {
+        path = env.PATH_TEST_SQLITE;
+    }
+    if (path == null) {
         throw new Error("env PATH_SQLITE is empty");
     }
-    if (!existsSync(env.PATH_SQLITE)) {
+    if (!existsSync(path)) {
         throw new Error("Database file not found");
     }
-    return new Database(env.PATH_SQLITE);
+    return new Database(path);
 }

@@ -15,11 +15,11 @@ declare global {
     
     type TaskHttp = {
         url: string;
-        method: "POST" | "PATCH" | "PUT" | "DELETE";
-        query?: {
+        method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+        body?: {
             [key: string]: string;
         };
-        body?: {
+        query?: {
             [key: string]: string;
         };
         headers?: {
@@ -28,14 +28,14 @@ declare global {
     }
     
     type TaskConfig = {
-        executionDelay?: number;
-        executionAt?: number;
-        retry?: number;
-        retryAt?: number;
-        retryInterval?: number;
-        retryExponential?: boolean;
-        timeout?: number;
-        responseType?: TaskResponseType;
+        executionDelay: number;
+        executeAt: number;
+        retry: number;
+        retryAt: number;
+        retryInterval: number;
+        retryExponential: boolean;
+        timeout: number;
+        responseType: TaskResponseType;
     }
     
     type TaskSubscriberRequest = {
@@ -43,6 +43,14 @@ declare global {
         config: TaskConfig;
     }
     
+    type Queue = {
+        id: string;
+        state: string;
+        statusCode: number;
+        estimateEndAt: number;
+        estimateExecutionAt: number;
+    }
+
     type SafeQueue = {
         id: string;
         subscription: Subscription;

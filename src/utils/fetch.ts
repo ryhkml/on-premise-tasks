@@ -33,7 +33,7 @@ export function httpRequest(req: TaskSubscriberRequest, additionalHeaders?: { [k
         });
     });
     return race(
-        timer(req.config.timeout!).pipe(
+        timer(req.config.timeout).pipe(
             map(() => {
                 throw "Request Timeout";
             })

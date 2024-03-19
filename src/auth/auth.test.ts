@@ -4,14 +4,13 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { treaty } from "@elysiajs/eden";
 
 import { subscriber } from "../apis/subscriber";
-import { tasksDb } from "../db";
 
 const port = +env.PORT! || 3200;
 const app = subscriber().listen(port);
 const api = treaty(app);
+const db = app.decorator.db;
 
-describe("Test auth", () => {
-    const db = tasksDb();
+describe("TEST AUTH", () => {
     const name = "test-auth";
     beforeAll(() => {
         db.exec("PRAGMA journal_mode = WAL;");

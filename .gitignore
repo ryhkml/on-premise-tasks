@@ -45,8 +45,8 @@ package-lock.json
 **/*.bun
 
 # DB
-db/tasks*
-db/*.db
+db/tasks.*
+db/test/tasks.*
 
 # Bin
 tasks

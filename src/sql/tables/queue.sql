@@ -1,4 +1,4 @@
-CREATE TABLE subscription (
+CREATE TABLE queue (
     id                     INTEGER PRIMARY KEY AUTOINCREMENT,
     queueId                TEXT UNIQUE NOT NULL,
     subscriberId           TEXT NOT NULL,
@@ -9,4 +9,4 @@ CREATE TABLE subscription (
     FOREIGN KEY (subscriberId) REFERENCES subscriber(subscriberId)
 );
 
-CREATE INDEX ixQueueId ON subscription(queueId);
+CREATE INDEX ixQueueId ON queue(queueId);
