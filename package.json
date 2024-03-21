@@ -1,27 +1,28 @@
 {
-    "name": "op-tasks",
-    "version": "1.0.50",
-    "private": true,
-    "maintainers": [
-        "Reyhan Kamil"
-    ],
-    "scripts": {
-        "bin": "bun build --compile --minify --sourcemap src/main.ts --outfile ./tasks",
-        "dev": "bun run --watch src/main.ts",
-        "reinit:db": "rm -rf db/tasks.* && bun run init-db.ts",
-        "reinit:testdb": "rm -rf db/test/tasks.* && bun run init-db.ts test"
-    },
-    "dependencies": {
-        "@elysiajs/eden": "^1.0.0",
-        "date-fns": "^3.5.0",
-        "elysia": "^1.0.0",
-        "lodash": "^4.17.21",
-        "rxjs": "^7.8.1",
-        "ulid": "^2.3.0"
-    },
-    "devDependencies": {
-        "@types/lodash": "^4.17.0",
-        "bun-types": "latest"
-    },
-    "module": "src/main.ts"
+	"name": "op-tasks",
+	"version": "1.0.50",
+	"private": true,
+	"maintainers": [
+		"Reyhan Kamil"
+	],
+	"scripts": {
+		"bin": "bun build --compile --minify --sourcemap src/main.ts --outfile ./tasks",
+		"dev": "bun run --watch src/main.ts",
+		"reinit:db": "rm -rf db/tasks.* && bun run init-db.ts",
+		"reinit:testdb": "rm -rf db/test/tasks.* && bun run init-db.ts test"
+	},
+	"dependencies": {
+		"@elysiajs/eden": "^1.0.0",
+		"axios": "^1.6.8",
+		"date-fns": "^3.5.0",
+		"elysia": "^1.0.0",
+		"lodash": "^4.17.21",
+		"rxjs": "^7.8.1",
+		"ulid": "^2.3.0"
+	},
+	"devDependencies": {
+		"@types/lodash": "^4.17.0",
+		"bun-types": "latest"
+	},
+	"module": "src/main.ts"
 }

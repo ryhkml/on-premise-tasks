@@ -1,6 +1,5 @@
 CREATE TABLE subscriberConfig (
     id                     INTEGER PRIMARY KEY AUTOINCREMENT,
-    subscriberConfigId     TEXT UNIQUE NOT NULL,
     queueId                TEXT NOT NULL,
     url                    TEXT NOT NULL,
     method                 TEXT NOT NULL,
@@ -17,8 +16,7 @@ CREATE TABLE subscriberConfig (
     retryTerminated        INTEGER NULL,
     estimateNextRetryAt    INTEGER NULL,
     timeout                INTEGER NULL,
-    responseType           TEXT NULL,
     FOREIGN KEY (queueId) REFERENCES queue(queueId)
 );
 
-CREATE INDEX ixSubscriberConfigId ON subscriberConfig(subscriberConfigId);
+CREATE INDEX ixSubscriberConfigQueueId ON subscriberConfig(queueId);

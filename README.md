@@ -49,10 +49,11 @@ bun bin
 
 ### Queue
 - `GET /queues/:id`
+- `GET /queues/:id/config`
 - `DELETE /queues/:id`
-- `PATCH /queues/pause/:id`
-- `PATCH /queues/resume/:id`
-- `PATCH /queues/unsubscribe/:id`
+- `PATCH /queues/:id/pause`
+- `PATCH /queues/:id/resume`
+- `PATCH /queues/:id/unsubscribe`
 - `POST /queues/register`
 
 ### Types
