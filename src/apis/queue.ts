@@ -1,16 +1,18 @@
 import { Database } from "bun:sqlite";
 
+import { randomBytes } from "node:crypto";
+
 import { Elysia, t } from "elysia";
 
 import { addMilliseconds, isBefore } from "date-fns";
 import { catchError, defer, map, retry, switchMap, tap, throwError, timer } from "rxjs";
-import { toSafeInteger } from "lodash";
+import { kebabCase, toSafeInteger } from "lodash";
 import { AxiosError } from "axios";
-import { ulid } from "ulid";
 
 import { pluginApi } from "../plugin";
 import { httpRequest } from "../utils/fetch";
 import { isValidSubscriber } from "../auth/auth";
+import { encr } from "../utils/crypto";
 
 export function queue() {
 	return new Elysia({ prefix: "/queues" })
@@ -90,6 +92,7 @@ export function queue() {
 			ctx.set.status = "Created";
 			return {
 				id: queue.id,
+				configId: queue.configId,
 				state: "RUNNING",
 				statusCode: 0,
 				estimateEndAt: 0,
@@ -112,8 +115,12 @@ export function queue() {
 				if (ctx.body.config.retryAt) {
 					ctx.body.config.retry = 1;
 					ctx.body.config.retryInterval = 0;
+					ctx.body.config.retryExponential = false;
 				} else {
 					ctx.body.config.retryAt = 0;
+				}
+				if (ctx.body.config.retry == 1) {
+					ctx.body.config.retryExponential = false;
 				}
 			},
 			beforeHandle(ctx) {
@@ -231,6 +238,7 @@ export function queue() {
 			response: {
 				201: t.Object({
 					id: t.String(),
+					configId: t.String(),
 					state: t.String({
 						default: "RUNNING"
 					}),
@@ -264,6 +272,7 @@ export function queue() {
 function isTasksInQueueReachTheLimit(db: Database, id: string) {
 	const q = db.query("SELECT tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?;");
 	const value = q.get(id) as Pick<SubscriberContext, "tasksInQueue" | "tasksInQueueLimit">;
+	q.finalize();
 	return value.tasksInQueue >= value.tasksInQueueLimit;
 }
 
@@ -278,56 +287,74 @@ function unsubscribeQueue(db: Database, id: string, queueId: string) {
 }
 
 function registerQueue(db: Database, id: string, today: number, body: TaskSubscriberRequest) {
-	const queueId = ulid().toLowerCase().substring(0, 13) + Date.now().toString().substring(6);
+	const queueId = randomBytes(6).toString("hex").toUpperCase() + today.toString();
+	const configId = randomBytes(6).toString("hex").toUpperCase() + today.toString();
+	const key = kebabCase(db.filename) + ":" + configId;
 	const dueTime = body.config.executeAt
 		? new Date(body.config.executeAt)
 		: body.config.executionDelay;
 	const estimateExecutionAt = typeof dueTime === "number"
 		? addMilliseconds(today, dueTime)
 		: dueTime;
-	const increment = db.prepare("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberId = ?;");
-	const decrement = db.prepare("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;");
-	const updateQueue = db.prepare("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);");
 	const subscription = timer(dueTime).pipe(
 		switchMap(() => {
 			let additionalHeaders = {} as { [k: string]: string };
+			let estimateNextRetryAt = 0;
 			return defer(() => httpRequest(body, additionalHeaders)).pipe(
 				map(res => ({
 					data: res.data,
 					status: res.status,
 					statusText: res.statusText
 				})),
-				catchError(error => throwError(() => {
-					if (error instanceof AxiosError) {
-						return {
-							status: toSafeInteger(error.response?.status)
-						};
+				catchError(error => {
+					if (body.config.retryAt) {
+						db.run(updateRetrying(), [
+							body.config.retryAt,
+							configId
+						]);
+					} else {
+						if (estimateNextRetryAt == 0) {
+							estimateNextRetryAt = addMilliseconds(Date.now(), body.config.retryInterval).getTime()
+						}
+						db.run(updateRetrying(), [
+							estimateNextRetryAt,
+							configId
+						]);
 					}
-					return {
-						status: 422
-					};
-				})),
+					return throwError(() => {
+						if (error instanceof AxiosError) {
+							return {
+								status: toSafeInteger(error.response?.status)
+							};
+						}
+						return {
+							status: 422
+						};
+					})
+				}),
 				retry({
 					count: body.config.retry,
 					delay(_, count) {
-						const dueTimeError = body.config.retryExponential
+						const errorToday = Date.now();
+						const errorDueTime = body.config.retryExponential
 							? body.config.retryInterval * count
 							: body.config.retryInterval;
-						const todayError = Date.now();
-						const tapError = () => {
+						const errorTap = () => {
+							estimateNextRetryAt = addMilliseconds(errorToday, errorDueTime).getTime();
 							additionalHeaders = {
 								...additionalHeaders,
 								"X-Tasks-Queue-Id": queueId,
 								"X-Tasks-Retry-Limit": body.config.retry.toString(),
 								"X-Tasks-Retry-Count": count.toString(),
-								"X-Tasks-Estimate-Next-Retry-At": addMilliseconds(todayError, body.config.retryInterval * count).getTime().toString()
+								"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
 							};
 							if (body.config.retry == count) {
 								delete additionalHeaders["X-Tasks-Estimate-Next-Retry-At"];
 							}
+							db.run(incrementRetryCount(), [configId]);
 						}
-						return timer(dueTimeError).pipe(
-							tap(() => tapError())
+						return timer(errorDueTime).pipe(
+							tap(() => errorTap())
 						);
 					}
 				})
@@ -337,30 +364,94 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 	.subscribe({
 		next(res) {
 			db.transaction(() => {
-				increment.run(id);
-				updateQueue.run("DONE", res.status, Date.now(), queueId);
+				db.run(incrementTasksInQueue(), [id]);
+				db.run(updateOnFinalizeQueue(), [
+					"DONE",
+					res.status,
+					Date.now(),
+					queueId
+				]);
+				db.run(updateOnEndRetrying(), [configId]);
 			})();
 		},
-		error(err) {
+		error(error) {
 			db.transaction(() => {
-				decrement.run(id);
-				updateQueue.run("ERROR", err.status, Date.now(), queueId);
+				db.run(decrementTasksInQueue(), [id]);
+				db.run(updateOnFinalizeQueue(), [
+					"ERROR",
+					error.status,
+					Date.now(),
+					queueId
+				]);
+				db.run(updateOnEndRetrying(), [configId]);
 			})();
 		}
 	});
 	db.transaction(() => {
-		increment.run(id);
-		db.run("INSERT INTO queue (queueId, subscriberId, state, statusCode, estimateEndAt, estimateExecutionAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6);", [
+		db.run(incrementTasksInQueue(), [id]);
+		db.run("INSERT INTO queue (queueId, subscriberId, estimateExecutionAt) VALUES (?1, ?2, ?3);", [
 			queueId,
 			id,
-			"RUNNING",
-			0,
-			estimateExecutionAt.getTime(),
 			estimateExecutionAt.getTime()
 		]);
+		db.run("INSERT INTO config (configId, queueId, url, method, timeout) VALUES (?1, ?2, ?3, ?4, ?5);", [
+			configId,
+			queueId,
+			encr(body.httpRequest.url, key),
+			body.httpRequest.method,
+			body.config.timeout
+		]);
+		if (body.config.executeAt) {
+			db.run(updateExecuteAt(), [
+				body.config.executeAt,
+				configId
+			]);
+		} else {
+			db.run(updateExecutionDelay(), [
+				body.config.executionDelay,
+				configId
+			]);
+		}
+		if (body.httpRequest.body) {
+			const strBody = JSON.stringify(body.httpRequest.body);
+			db.run(updateBody(), [
+				encr(strBody, key),
+				configId
+			]);
+		}
+		if (body.httpRequest.query) {
+			const strQuery = JSON.stringify(body.httpRequest.query);
+			db.run(updateQuery(), [
+				encr(strQuery, key),
+				configId
+			]);
+		}
+		if (body.httpRequest.headers) {
+			const strHeaders = JSON.stringify(body.httpRequest.headers);
+			db.run(updateHeaders(), [
+				encr(strHeaders, key),
+				configId
+			]);
+		}
+		if (body.config.retryAt) {
+			db.run(updateRetryAt(), [
+				body.config.retryAt,
+				configId
+			]);
+		}
+		if (body.config.retry) {
+			const retryExponential = body.config.retryExponential ? 1 : 0;
+			db.run(updateRetry(), [
+				body.config.retry,
+				body.config.retryInterval,
+				retryExponential,
+				configId
+			]);
+		}
 	})();
 	return {
 		id: queueId,
+		configId,
 		estimateExecutionAt: estimateExecutionAt.getTime(),
 		subscription
 	};
@@ -370,7 +461,123 @@ function deleteQueue(db: Database, queueId: string) {
 	db.run("DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);", [queueId]);
 }
 
+function getConfig(db: Database) {
+	const q = db.query("SELECT * FROM config WHERE queueId IN (SELECT queueId FROM queue);");
+	const value = q.get();
+	q.finalize();
+	return value;
+}
+
+function getQueues(db: Database, id: string) {
+	const q = db.query("SELECT * EXCEPT (id) FROM queue WHERE subscriberId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
+	const value = q.all(id) as Array<Queue> | null;
+	q.finalize();
+	return value;
+}
+
 function getQueue(db: Database, queueId: string) {
-	const q = db.query("SELECT queueId, state, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
-	return q.get(queueId) as Queue | null;
+	const q = db.query("SELECT * FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
+	const value = q.get(queueId) as Queue | null;
+	q.finalize();
+	return value;
+}
+
+/**
+ * ?1 = subscriberId
+*/
+function incrementTasksInQueue() {
+	return "UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberId = ?;";
+}
+
+/**
+ * ?1 = subscriberId
+*/
+function decrementTasksInQueue() {
+	return "UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;";
+}
+
+/**
+ * ?1 = configId
+*/
+function incrementRetryCount() {
+	return "UPDATE config SET retryCount = retryCount + 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 = executionDelay,
+ * ?2 = configId
+*/
+function updateExecutionDelay() {
+	return "UPDATE config SET executionDelay = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 = executionDelay,
+ * ?2 = configId
+*/
+function updateExecuteAt() {
+	return "UPDATE config SET executeAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 bodyStringify,
+ * ?2 configId
+*/
+function updateBody() {
+	return "UPDATE config SET bodyStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 queryStringify,
+ * ?2 configId
+*/
+function updateQuery() {
+	return "UPDATE config SET queryStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 headersStringify,
+ * ?2 configId
+*/
+function updateHeaders() {
+	return "UPDATE config SET headersStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 = retryAt,
+ * ?2 = configId
+*/
+function updateRetryAt() {
+	return "UPDATE config SET retry = 1, retryAt = ?1, retryLimit = 1, retryExponential = 0 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 = retry & retryLimit,
+ * ?2 = retryInterval,
+ * ?3 = retryExponential,
+ * ?4 = configId
+*/
+function updateRetry() {
+	return "UPDATE config SET retry = ?1, retryLimit = ?1, retryInterval = ?2, retryExponential = ?3 WHERE configId = ?4 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+function updateRetrying() {
+	return "UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
+}
+
+/**
+ * ?1 = state,
+ * ?2 = statusCode,
+ * ?3 = estimateEndAt,
+ * ?4 = queueId
+*/
+function updateOnFinalizeQueue() {
+	return "UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);";
+}
+
+/**
+ * ?1 = state
+*/
+function updateOnEndRetrying() {
+	return "UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);";
 }

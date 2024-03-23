@@ -1,5 +1,5 @@
 import { env } from "bun";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
 
@@ -11,9 +11,6 @@ const api = treaty(app);
 const db = app.decorator.db;
 
 describe("Test API", () => {
-	beforeAll(() => {
-		db.exec("PRAGMA journal_mode = WAL;");
-	});
 	describe("GET /subscribers/:name", async () => {
 		const name = "test-get-subscribers";
 		beforeEach(() => {

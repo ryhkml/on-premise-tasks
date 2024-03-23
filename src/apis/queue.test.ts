@@ -1,5 +1,5 @@
 import { env, sleep } from "bun";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
 
@@ -16,9 +16,6 @@ describe("Test API", () => {
 	const apiSubscriber = treaty(
 		subscriber().listen(port)
 	);
-	beforeAll(() => {
-		db.exec("PRAGMA journal_mode = WAL;");
-	});
 	describe("GET /queues/:id", () => {
 		beforeEach(() => {
 			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
@@ -63,7 +60,6 @@ describe("Test API", () => {
 			db.run("DELETE FROM queue WHERE queueId = ?;", [data?.id!]);
 		});
 	});
-
 
 	describe("POST /queues/register", async () => {
 		beforeEach(() => {
@@ -187,6 +183,34 @@ describe("Test API", () => {
 				}
 			});
 			expect(status).toBe(400);
+		});
+		it("should retrying 2 times if task gives an error response", async () => {
+			const dueTime = 3000;
+			const { data } = await apiSubscriber.subscribers.register.post({ name });
+			const queue = await api.queues.register.post({
+				httpRequest: {
+					url: "https://api.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...app.decorator.defaultConfig,
+					executionDelay: dueTime,
+					retry: 2,
+					retryExponential: false
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + data?.key!,
+					"x-tasks-subscriber-id": data?.id!
+				}
+			});
+			// Wait for tasks
+			await sleep(4000);
+			// ...
+			const q = db.query("SELECT q.state, c.retryCount FROM queue AS q JOIN config as c ON q.queueId = c.queueId WHERE q.queueId = ?;");
+			const { state, retryCount } = q.get(queue.data?.id!) as { state: string, retryCount: number };
+			expect(state).toBe("ERROR");
+			expect(retryCount).toBe(2);
 		});
 	});
 

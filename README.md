@@ -85,7 +85,6 @@ type TasksConfig = {
     retryInterval?: number; // Default 0, min: 0, max: 86400000
     retryExponential?: boolean; // Default true
     timeout?: number; // Default 30000, min: 1000, max: 300000
-    responseType?: "TEXT" | "JSON"; // Default TEXT
 }
 ```
 An example of requesting a Task

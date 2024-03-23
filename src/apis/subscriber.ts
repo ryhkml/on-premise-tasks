@@ -144,9 +144,7 @@ export function subscriber() {
 				subscriberId: id,
 				subscriberName: ctx.body.name,
 				createdAt: ctx.today,
-				key: secretKey,
-				tasksInQueue: 0,
-				tasksInQueueLimit: 1000
+				key: secretKey
 			});
 			if (subscriber == null) {
 				return ctx.error("Internal Server Error", {
@@ -202,30 +200,25 @@ export function subscriber() {
 function isSubscriberRegistered(db: Database, name: string) {
 	const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?);");
 	const obj = q.get(name) as { [k: string]: number };
+	q.finalize();
 	const value = Object.values(obj)[0];
 	return !!value;
 };
 
-function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id">) {
-	db.run("INSERT INTO subscriber (subscriberId, subscriberName, createdAt, key, tasksInQueue, tasksInQueueLimit) VALUES (?1, ?2, ?3, ?4, ?5, ?6);", [
+function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksInQueue" | "tasksInQueueLimit">) {
+	db.run("INSERT INTO subscriber (subscriberId, subscriberName, createdAt, key) VALUES (?1, ?2, ?3, ?4);", [
 		ctx.subscriberId,
 		ctx.subscriberName,
 		ctx.createdAt,
-		ctx.key,
-		ctx.tasksInQueue,
-		ctx.tasksInQueueLimit
+		ctx.key
 	]);
-	const q = db.query("SELECT id FROM subscriber WHERE subscriberId = ?;");
-	const value = q.get(ctx.subscriberId) as Pick<SubscriberContext, "id"> | null;
-	if (value == null) {
-		return null;
-	}
 	return "Done";
 };
 
 function getSubscriber(db: Database, id: string, name: string) {
 	const q = db.query("SELECT subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?;");
 	const value = q.get(id) as Omit<SubscriberContext, "id" | "key" | "subscriberId">;
+	q.finalize();
 	if (value.subscriberName != name) {
 		return null;
 	}
@@ -235,6 +228,7 @@ function getSubscriber(db: Database, id: string, name: string) {
 function deleteSubscriber(db: Database, id: string, name: string) {
 	const q = db.query("SELECT subscriberName, tasksInQueue FROM subscriber WHERE subscriberId = ?;");
 	const value = q.get(id) as Pick<SubscriberContext, "subscriberName" | "tasksInQueue">;
+	q.finalize();
 	if (value.tasksInQueue >= 1 || value.subscriberName != name) {
 		return null;
 	}

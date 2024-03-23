@@ -26,15 +26,24 @@ async function initDb() {
 		} else {
 			console.log("Table subscriber created");
 		}
+		console.log();
 		const createQueueTable = await file("./src/sql/tables/queue.sql").text();
 		db.run(createQueueTable);
 		if (isDev) {
 			console.log("Table test queue created");
-			console.log("Sqlite test file in", path);
 		} else {
 			console.log("Table queue created");
-			console.log("Sqlite file in", path);
 		}
+		console.log();
+		const createConfigTable = await file("./src/sql/tables/config.sql").text();
+		db.run(createConfigTable);
+		if (isDev) {
+			console.log("Table test config created");
+		} else {
+			console.log("Table config created");
+		}
+		console.log();
+		console.log("Sqlite file in", path);
 	} catch (e) {
 		console.error(e);
 	}

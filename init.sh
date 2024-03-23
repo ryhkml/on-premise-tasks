@@ -8,8 +8,8 @@ cat <<EOF >.env
 TZ="UTC"
 PORT=
 LEVEL="DEV" # Comment this for production usage
-PATH_SQLITE="./db/tasks.db"
-PATH_TEST_SQLITE="./db/test/tasks.db"
+PATH_SQLITE="./db/tasks.sqlite"
+PATH_TEST_SQLITE="./db/test/tasks.sqlite"
 EOF
 
 echo ".env file created"
