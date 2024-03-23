@@ -100,7 +100,7 @@ curl -X POST \
             "method": "GET"
         },
         "config": {
-            "executionDelay": 1710880762570,
+            "executionDelay": 86400000,
             "retry": 5,
             "retryInterval": 3600000,
             "retryExponential": false

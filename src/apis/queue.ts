@@ -469,7 +469,7 @@ function getConfig(db: Database) {
 }
 
 function getQueues(db: Database, id: string) {
-	const q = db.query("SELECT * EXCEPT (id) FROM queue WHERE subscriberId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
+	const q = db.query("SELECT * FROM queue WHERE subscriberId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
 	const value = q.all(id) as Array<Queue> | null;
 	q.finalize();
 	return value;
