@@ -133,24 +133,19 @@ export function subscriber() {
 			})
 		)
 		.post("/register", async ctx => {
-			const id = ulid().toLowerCase();
+			const id = ulid();
 			const key = "t-" + Buffer.from(id + ":" + ctx.today).toString("base64");
 			const secretKey = await password.hash(key, {
 				algorithm: "argon2id",
 				memoryCost: 4,
 				timeCost: 3
 			});
-			const subscriber = addSubscriber(ctx.db, {
+			addSubscriber(ctx.db, {
 				subscriberId: id,
 				subscriberName: ctx.body.name,
 				createdAt: ctx.today,
 				key: secretKey
 			});
-			if (subscriber == null) {
-				return ctx.error("Internal Server Error", {
-					message: "The server returned an error"
-				});
-			}
 			ctx.set.status = "Created";
 			return {
 				id,
@@ -212,7 +207,6 @@ function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksI
 		ctx.createdAt,
 		ctx.key
 	]);
-	return "Done";
 };
 
 function getSubscriber(db: Database, id: string, name: string) {

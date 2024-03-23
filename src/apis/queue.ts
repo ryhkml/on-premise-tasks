@@ -22,6 +22,10 @@ export function queue() {
 		})
 		.state("queues", [] as Array<SafeQueue>)
 		.guard({
+			headers: t.Object({
+				"authorization": t.String(),
+				"x-tasks-subscriber-id": t.String()
+			}),
 			params: t.Object({
 				id: t.String({
 					default: null
@@ -217,6 +221,10 @@ export function queue() {
 					})
 				})
 			}),
+			headers: t.Object({
+				"authorization": t.String(),
+				"x-tasks-subscriber-id": t.String()
+			}),
 			detail: {
 				tags: ["Queue"],
 				summary: "Register queue",
@@ -308,7 +316,7 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 				})),
 				catchError(error => {
 					if (body.config.retryAt) {
-						db.run(updateRetrying(), [
+						db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 							body.config.retryAt,
 							configId
 						]);
@@ -316,7 +324,7 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 						if (estimateNextRetryAt == 0) {
 							estimateNextRetryAt = addMilliseconds(Date.now(), body.config.retryInterval).getTime()
 						}
-						db.run(updateRetrying(), [
+						db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 							estimateNextRetryAt,
 							configId
 						]);
@@ -351,7 +359,7 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 							if (body.config.retry == count) {
 								delete additionalHeaders["X-Tasks-Estimate-Next-Retry-At"];
 							}
-							db.run(incrementRetryCount(), [configId]);
+							db.run("UPDATE config SET retryCount = retryCount + 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 						}
 						return timer(errorDueTime).pipe(
 							tap(() => errorTap())
@@ -364,31 +372,31 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 	.subscribe({
 		next(res) {
 			db.transaction(() => {
-				db.run(incrementTasksInQueue(), [id]);
-				db.run(updateOnFinalizeQueue(), [
+				db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [id]);
+				db.run("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 					"DONE",
 					res.status,
 					Date.now(),
 					queueId
 				]);
-				db.run(updateOnEndRetrying(), [configId]);
+				db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 			})();
 		},
 		error(error) {
 			db.transaction(() => {
-				db.run(decrementTasksInQueue(), [id]);
-				db.run(updateOnFinalizeQueue(), [
+				db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [id]);
+				db.run("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 					"ERROR",
 					error.status,
 					Date.now(),
 					queueId
 				]);
-				db.run(updateOnEndRetrying(), [configId]);
+				db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 			})();
 		}
 	});
 	db.transaction(() => {
-		db.run(incrementTasksInQueue(), [id]);
+		db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberId = ?;", [id]);
 		db.run("INSERT INTO queue (queueId, subscriberId, estimateExecutionAt) VALUES (?1, ?2, ?3);", [
 			queueId,
 			id,
@@ -402,46 +410,46 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 			body.config.timeout
 		]);
 		if (body.config.executeAt) {
-			db.run(updateExecuteAt(), [
+			db.run("UPDATE config SET executeAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				body.config.executeAt,
 				configId
 			]);
 		} else {
-			db.run(updateExecutionDelay(), [
+			db.run("UPDATE config SET executionDelay = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				body.config.executionDelay,
 				configId
 			]);
 		}
 		if (body.httpRequest.body) {
 			const strBody = JSON.stringify(body.httpRequest.body);
-			db.run(updateBody(), [
+			db.run("UPDATE config SET bodyStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				encr(strBody, key),
 				configId
 			]);
 		}
 		if (body.httpRequest.query) {
 			const strQuery = JSON.stringify(body.httpRequest.query);
-			db.run(updateQuery(), [
+			db.run("UPDATE config SET queryStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				encr(strQuery, key),
 				configId
 			]);
 		}
 		if (body.httpRequest.headers) {
 			const strHeaders = JSON.stringify(body.httpRequest.headers);
-			db.run(updateHeaders(), [
+			db.run("UPDATE config SET headersStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				encr(strHeaders, key),
 				configId
 			]);
 		}
 		if (body.config.retryAt) {
-			db.run(updateRetryAt(), [
+			db.run("UPDATE config SET retry = 1, retryAt = ?1, retryLimit = 1, retryExponential = 0 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				body.config.retryAt,
 				configId
 			]);
 		}
 		if (body.config.retry) {
 			const retryExponential = body.config.retryExponential ? 1 : 0;
-			db.run(updateRetry(), [
+			db.run("UPDATE config SET retry = ?1, retryLimit = ?1, retryInterval = ?2, retryExponential = ?3 WHERE configId = ?4 AND queueId IN (SELECT queueId FROM queue);", [
 				body.config.retry,
 				body.config.retryInterval,
 				retryExponential,
@@ -480,104 +488,4 @@ function getQueue(db: Database, queueId: string) {
 	const value = q.get(queueId) as Queue | null;
 	q.finalize();
 	return value;
-}
-
-/**
- * ?1 = subscriberId
-*/
-function incrementTasksInQueue() {
-	return "UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberId = ?;";
-}
-
-/**
- * ?1 = subscriberId
-*/
-function decrementTasksInQueue() {
-	return "UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;";
-}
-
-/**
- * ?1 = configId
-*/
-function incrementRetryCount() {
-	return "UPDATE config SET retryCount = retryCount + 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 = executionDelay,
- * ?2 = configId
-*/
-function updateExecutionDelay() {
-	return "UPDATE config SET executionDelay = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 = executionDelay,
- * ?2 = configId
-*/
-function updateExecuteAt() {
-	return "UPDATE config SET executeAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 bodyStringify,
- * ?2 configId
-*/
-function updateBody() {
-	return "UPDATE config SET bodyStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 queryStringify,
- * ?2 configId
-*/
-function updateQuery() {
-	return "UPDATE config SET queryStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 headersStringify,
- * ?2 configId
-*/
-function updateHeaders() {
-	return "UPDATE config SET headersStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 = retryAt,
- * ?2 = configId
-*/
-function updateRetryAt() {
-	return "UPDATE config SET retry = 1, retryAt = ?1, retryLimit = 1, retryExponential = 0 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 = retry & retryLimit,
- * ?2 = retryInterval,
- * ?3 = retryExponential,
- * ?4 = configId
-*/
-function updateRetry() {
-	return "UPDATE config SET retry = ?1, retryLimit = ?1, retryInterval = ?2, retryExponential = ?3 WHERE configId = ?4 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-function updateRetrying() {
-	return "UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);";
-}
-
-/**
- * ?1 = state,
- * ?2 = statusCode,
- * ?3 = estimateEndAt,
- * ?4 = queueId
-*/
-function updateOnFinalizeQueue() {
-	return "UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);";
-}
-
-/**
- * ?1 = state
-*/
-function updateOnEndRetrying() {
-	return "UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);";
 }
