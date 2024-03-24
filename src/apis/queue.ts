@@ -96,7 +96,6 @@ export function queue() {
 			ctx.set.status = "Created";
 			return {
 				id: queue.id,
-				configId: queue.configId,
 				state: "RUNNING",
 				statusCode: 0,
 				estimateEndAt: 0,
@@ -278,10 +277,10 @@ export function queue() {
 }
 
 function isTasksInQueueReachTheLimit(db: Database, id: string) {
-	const q = db.query("SELECT tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?;");
-	const value = q.get(id) as Pick<SubscriberContext, "tasksInQueue" | "tasksInQueueLimit">;
+	const q = db.query("SELECT 1 FROM subscriber WHERE subscriberId = ? AND tasksInQueue < tasksInQueueLimit;");
+	const value = q.get(id) as { "1": 1 } | null;
 	q.finalize();
-	return value.tasksInQueue >= value.tasksInQueueLimit;
+	return !value;
 }
 
 function unsubscribeQueue(db: Database, id: string, queueId: string) {
@@ -459,14 +458,13 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 	})();
 	return {
 		id: queueId,
-		configId,
 		estimateExecutionAt: estimateExecutionAt.getTime(),
 		subscription
 	};
 }
 
-function deleteQueue(db: Database, queueId: string) {
-	db.run("DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);", [queueId]);
+function deleteQueue(db: Database, id: string) {
+	db.run("DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);", [id]);
 }
 
 function getConfig(db: Database) {
@@ -483,9 +481,9 @@ function getQueues(db: Database, id: string) {
 	return value;
 }
 
-function getQueue(db: Database, queueId: string) {
+function getQueue(db: Database, id: string) {
 	const q = db.query("SELECT * FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
-	const value = q.get(queueId) as Queue | null;
+	const value = q.get(id) as Queue | null;
 	q.finalize();
 	return value;
 }

@@ -6,3 +6,6 @@ docker-compose*
 cosign*
 
 note.txt
+
+db/tasks.*
+db/test/tasks.*

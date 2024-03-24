@@ -1,7 +1,9 @@
-import { env, sleep } from "bun";
+import { env } from "bun";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
+
+import { firstValueFrom, timer } from "rxjs";
 
 import { queue } from "./queue";
 import { subscriber } from "./subscriber";
@@ -55,7 +57,7 @@ describe("Test API", () => {
 			expect(queue.data).toHaveProperty("estimateEndAt");
 			expect(queue.data).toHaveProperty("estimateExecutionAt");
 			// Waiting for task
-			await sleep(dueTime + 1000);
+			await firstValueFrom(timer(dueTime + 1000));
 			// ...
 			db.run("DELETE FROM queue WHERE queueId = ?;", [data?.id!]);
 		});
@@ -88,7 +90,7 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(201);
 			// Waiting for task
-			await sleep(dueTime + 1000);
+			await firstValueFrom(timer(dueTime + 1000));
 			// ...
 			const q = db.query("SELECT state, statusCode FROM queue WHERE queueId = ?;");
 			const { state, statusCode } = q.get(data?.id!) as Pick<Queue, "state" | "statusCode">;
@@ -116,7 +118,7 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(201);
 			// Waiting for task
-			await sleep(dueTime + 1000);
+			await firstValueFrom(timer(dueTime + 1000));
 			// ...
 			const q = db.query("SELECT state FROM queue WHERE queueId = ?;");
 			const { state } = q.get(data?.id!) as Pick<Queue, "state">;
@@ -205,12 +207,12 @@ describe("Test API", () => {
 				}
 			});
 			// Wait for tasks
-			await sleep(4000);
+			await firstValueFrom(timer(4000));
 			// ...
 			const q = db.query("SELECT q.state, c.retryCount FROM queue AS q JOIN config as c ON q.queueId = c.queueId WHERE q.queueId = ?;");
-			const { state, retryCount } = q.get(queue.data?.id!) as { state: string, retryCount: number };
-			expect(state).toBe("ERROR");
-			expect(retryCount).toBe(2);
+			const value = q.get(queue.data?.id!) as { state: string, retryCount: number } | null;
+			expect(value?.state).toBe("ERROR");
+			expect(value?.retryCount).toBe(2);
 		});
 	});
 
@@ -240,7 +242,7 @@ describe("Test API", () => {
 				}
 			});
 			expect(status).toBe(201);
-			await sleep(1000);
+			await firstValueFrom(timer(1000));
 			const unsubscribe = await api.queues({ id: data?.id! }).unsubscribe.patch(null, {
 				headers: {
 					"authorization": "Bearer " + credential.data?.key!,

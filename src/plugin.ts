@@ -7,13 +7,6 @@ export function pluginApi() {
 	return new Elysia({ name: "pluginApi" })
 		.decorate("db", tasksDb())
 		.derive({ as: "global" }, ctx => {
-			if (ctx.path == "/subscribers/register") {
-				return {
-					id: "",
-					key: "",
-					today: Date.now()
-				};
-			}
 			const auth = ctx.headers["authorization"];
 			return {
 				id: toString(ctx.headers["x-tasks-subscriber-id"]).trim(),

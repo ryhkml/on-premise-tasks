@@ -7,10 +7,10 @@ import { ulid } from "ulid";
 
 import { isValidSubscriber } from "../auth/auth";
 import { pluginApi } from "../plugin";
+import { tasksDb } from "../db";
 
 export function subscriber() {
 	return new Elysia({ prefix: "/subscribers" })
-		.use(pluginApi())
 		.guard({
 			async beforeHandle(ctx) {
 				// @ts-ignore
@@ -28,6 +28,7 @@ export function subscriber() {
 				})
 			})
 		}, api => api
+			.use(pluginApi())
 			.get("/:name", ctx => {
 				const subscriber = getSubscriber(ctx.db, ctx.id, ctx.params.name);
 				if (subscriber == null) {
@@ -132,6 +133,10 @@ export function subscriber() {
 				}
 			})
 		)
+		.decorate("db", tasksDb())
+		.derive({ as: "scoped" }, () => ({
+			today: Date.now()
+		}))
 		.post("/register", async ctx => {
 			const id = ulid();
 			const key = "t-" + Buffer.from(id + ":" + ctx.today).toString("base64");
@@ -156,8 +161,7 @@ export function subscriber() {
 				ctx.body.name = deburr(ctx.body.name).trim();
 			},
 			beforeHandle(ctx) {
-				const isRegistered = isSubscriberRegistered(ctx.db, ctx.body.name);
-				if (isRegistered) {
+				if (isSubscriberRegistered(ctx.db, ctx.body.name)) {
 					return ctx.error("Conflict", {
 						message: "Subscriber has already registered"
 					});
@@ -210,20 +214,20 @@ function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksI
 };
 
 function getSubscriber(db: Database, id: string, name: string) {
-	const q = db.query("SELECT subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?;");
-	const value = q.get(id) as Omit<SubscriberContext, "id" | "key" | "subscriberId">;
+	const q = db.query("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2;");
+	const value = q.get(id, name) as Omit<SubscriberContext, "id" | "key"> | null;
 	q.finalize();
-	if (value.subscriberName != name) {
+	if (value == null) {
 		return null;
 	}
 	return value;
 };
 
 function deleteSubscriber(db: Database, id: string, name: string) {
-	const q = db.query("SELECT subscriberName, tasksInQueue FROM subscriber WHERE subscriberId = ?;");
-	const value = q.get(id) as Pick<SubscriberContext, "subscriberName" | "tasksInQueue">;
+	const q = db.query("SELECT tasksInQueue FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0;");
+	const value = q.get(id, name) as Pick<SubscriberContext, "tasksInQueue"> | null;
 	q.finalize();
-	if (value.tasksInQueue >= 1 || value.subscriberName != name) {
+	if (value == null) {
 		return null;
 	}
 	db.run("DELETE FROM subscriber WHERE subscriberId = ?;", [id]);
