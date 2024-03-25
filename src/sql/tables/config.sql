@@ -15,6 +15,7 @@ CREATE TABLE config (
 	retryCount 				INTEGER NULL DEFAULT 0,
 	retryLimit 				INTEGER NULL DEFAULT 0,
 	retryInterval 			INTEGER NULL DEFAULT 0,
+	retryStatusCode 		TEXT NULL DEFAULT "[]",
 	retryExponential 		INTEGER NULL DEFAULT 1,
 	estimateNextRetryAt 	INTEGER NULL DEFAULT 0,
 	timeout 				INTEGER NULL DEFAULT 30000,

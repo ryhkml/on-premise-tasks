@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { Elysia, t } from "elysia";
 
 import { addMilliseconds, isBefore } from "date-fns";
-import { catchError, defer, map, retry, switchMap, tap, throwError, timer } from "rxjs";
+import { catchError, defer, map, of, retry, switchMap, tap, throwError, timer } from "rxjs";
 import { kebabCase, toSafeInteger } from "lodash";
 import { AxiosError } from "axios";
 
@@ -84,6 +84,7 @@ export function queue() {
 			retry: 0,
 			retryAt: 0,
 			retryInterval: 0,
+			retryStatusCode: [] as Array<number>,
 			retryExponential: true,
 			timeout: 30000
 		})
@@ -163,7 +164,9 @@ export function queue() {
 			body: t.Object({
 				httpRequest: t.Object({
 					url: t.String({
-						default: null
+						default: null,
+						pattern: "^(http|https)://([a-zA-Z0-9]+([-.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,})(/[a-zA-Z0-9_.-]*)*/?$",
+						maxLength: 2048
 					}),
 					method: t.Union([
 						t.Literal("GET"),
@@ -175,48 +178,61 @@ export function queue() {
 						default: null
 					}),
 					body: t.Optional(
-						t.Record(t.String(), t.String(), {
+						t.Record(t.String({ maxLength: 128 }), t.String({ maxLength: 4096 }), {
 							default: null
 						})
 					),
 					query: t.Optional(
-						t.Record(t.String(), t.String(), {
+						t.Record(t.String({ maxLength: 128 }), t.String({ maxLength: 4096 }), {
 							default: null
 						})
 					),
 					headers: t.Optional(
-						t.Record(t.String(), t.String(), {
+						t.Record(t.String({ maxLength: 128 }), t.String({ maxLength: 4096 }), {
 							default: null
 						})
 					)
 				}),
 				config: t.Object({
 					executionDelay: t.Integer({
-						default: 1
+						default: 1,
+						minimum: 0
 					}),
 					executeAt: t.Integer({
-						default: 0
+						default: 0,
+						minimum: 0
 					}),
 					retry: t.Integer({
 						default: 0,
 						minimum: 0,
-						maximum: 128
+						maximum: 4096
 					}),
 					retryAt: t.Integer({
-						default: 0
+						default: 0,
+						minimum: 0
 					}),
 					retryInterval: t.Integer({
 						default: 0,
 						minimum: 0,
-						maximum: 86400000
+						maximum: 604800000
 					}),
+					retryStatusCode: t.Array(
+						t.Integer({
+							minimum: 400,
+							maximum: 599
+						}), {
+							default: [],
+							minItems: 0,
+							maxItems: 40
+						}
+					),
 					retryExponential: t.Boolean({
 						default: true
 					}),
 					timeout: t.Integer({
 						default: 30000,
 						minimum: 1000,
-						maximum: 300000
+						maximum: 3600000
 					})
 				})
 			}),
@@ -310,34 +326,43 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 			return defer(() => httpRequest(body, additionalHeaders)).pipe(
 				map(res => ({
 					data: res.data,
+					state: "DONE",
 					status: res.status,
 					statusText: res.statusText
 				})),
 				catchError(error => {
-					if (body.config.retryAt) {
-						db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
-							body.config.retryAt,
-							configId
-						]);
-					} else {
-						if (estimateNextRetryAt == 0) {
-							estimateNextRetryAt = addMilliseconds(Date.now(), body.config.retryInterval).getTime()
+					if (error instanceof AxiosError) {
+						const errorStatus = toSafeInteger(error.response?.status);
+						const someErrorStatus = body.config.retryStatusCode.some(status => status == errorStatus);
+						if (body.config.retryStatusCode.length == 0 || someErrorStatus) {
+							if (body.config.retryAt) {
+								db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
+									body.config.retryAt,
+									configId
+								]);
+							} else {
+								if (estimateNextRetryAt == 0) {
+									estimateNextRetryAt = addMilliseconds(Date.now(), body.config.retryInterval).getTime()
+								}
+								db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
+									estimateNextRetryAt,
+									configId
+								]);
+							}
+							return throwError(() => ({
+								status: errorStatus
+							}));
 						}
-						db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
-							estimateNextRetryAt,
-							configId
-						]);
+						return of({
+							data: null,
+							state: "ERROR",
+							status: errorStatus,
+							statusText: error.response?.statusText || ""
+						});
 					}
-					return throwError(() => {
-						if (error instanceof AxiosError) {
-							return {
-								status: toSafeInteger(error.response?.status)
-							};
-						}
-						return {
-							status: 422
-						};
-					})
+					return throwError(() => ({
+						status: 500
+					}))
 				}),
 				retry({
 					count: body.config.retry,
@@ -373,7 +398,7 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 			db.transaction(() => {
 				db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [id]);
 				db.run("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
-					"DONE",
+					res.state,
 					res.status,
 					Date.now(),
 					queueId
@@ -452,6 +477,12 @@ function registerQueue(db: Database, id: string, today: number, body: TaskSubscr
 				body.config.retry,
 				body.config.retryInterval,
 				retryExponential,
+				configId
+			]);
+		}
+		if (body.config.retryStatusCode.length) {
+			db.run("UPDATE config SET retryStatusCode = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
+				JSON.stringify(body.config.retryStatusCode),
 				configId
 			]);
 		}

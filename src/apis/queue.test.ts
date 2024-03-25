@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { treaty } from "@elysiajs/eden";
 
 import { firstValueFrom, timer } from "rxjs";
+import { addMilliseconds } from "date-fns";
 
 import { queue } from "./queue";
 import { subscriber } from "./subscriber";
@@ -166,8 +167,10 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(400);
 		});
-		it("should respond status code 400 if the \"retryAt\" execution time is earlier than the current time", async () => {
+		it("should respond status code 400 if the \"retryAt\" execution time is earlier than the execution time", async () => {
+			const delay = 3000;
 			const today = Date.now();
+			const estimateExecutionTime = addMilliseconds(today, delay).getTime();
 			const { data } = await apiSubscriber.subscribers.register.post({ name });
 			const { status } = await api.queues.register.post({
 				httpRequest: {
@@ -176,7 +179,8 @@ describe("Test API", () => {
 				},
 				config: {
 					...app.decorator.defaultConfig,
-					retryAt: today - 666
+					executionDelay: delay,
+					retryAt: estimateExecutionTime - 666
 				}
 			}, {
 				headers: {

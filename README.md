@@ -78,13 +78,14 @@ type TasksHttp = {
 }
 
 type TasksConfig = {
-    executionDelay?: number; // Default 1
+    executionDelay?: number; // Default 1ms, min: 0
     executeAt?: number; // Default 0
-    retry?: number; // Default 0, min: 0, max: 128
+    retry?: number; // Default 0, min: 0, max: 4096
     retryAt?: number; // Default 0
-    retryInterval?: number; // Default 0, min: 0, max: 86400000
+    retryInterval?: number; // Default 0, min: 0, max: 604800000ms
+    retryStatusCode?: Array<number>; // Default []
     retryExponential?: boolean; // Default true
-    timeout?: number; // Default 30000, min: 1000, max: 300000
+    timeout?: number; // Default 30000ms, min: 1000ms, max: 3600000ms
 }
 ```
 An example of requesting a Task
@@ -112,15 +113,15 @@ curl -X POST \
 The example above, the task will be executed after waiting for 1 day. If the task receives a 4xx-5xx error response, it will be run again 5 times with a 1-hour interval between each execution. If `retryExponential = true`, the interval between each execution will increase
 
 ```
-retryInterval = 3600000
+retryInterval = 3600000ms
 
-Retry-1, 3600000 * 1 = 3600000
-Retry-2, 3600000 * 2 = 7200000
-Retry-3, 3600000 * 3 = 10800000
+Retry-1, 3600000 * 1 = 3600000ms
+Retry-2, 3600000 * 2 = 7200000ms
+Retry-3, 3600000 * 3 = 10800000ms
 
 And so on...
 ```
-Additionally, you can make specific requests for when tasks will be executed using `executeAt`
+Additionally, you can make a specific request by using `executeAt`
 
 ```sh
 curl -X POST \
@@ -142,4 +143,4 @@ Please note that properties ending with `"At"` are in UNIX time format:
 - `executeAt`
 - `retryAt`
 
-To find out milliseconds in various programming languages, you can visit the website https://currentmillis.com. And remember to set the environment variable `TZ=UTC` on the Tasks Server.
+To find out milliseconds in various programming languages, you can visit https://currentmillis.com and remember to set the environment variable `TZ=UTC` on the Tasks Server.

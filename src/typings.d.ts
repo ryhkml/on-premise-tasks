@@ -33,6 +33,7 @@ declare global {
 		retry: number;
 		retryAt: number;
 		retryInterval: number;
+		retryStatusCode: Array<number>;
 		retryExponential: boolean;
 		timeout: number;
 	}
