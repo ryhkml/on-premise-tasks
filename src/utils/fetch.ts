@@ -5,7 +5,7 @@ import { defer } from "rxjs";
 
 import axios from "axios";
 
-export function httpRequest(req: TaskSubscriberRequest, additionalHeaders?: { [k: string]: string }) {
+export function fetch(req: TaskSubscriberRequest, additionalHeaders?: { [k: string]: string }) {
 	return defer(() => {
 		let headers = {};
 		if (req.httpRequest.headers) {

@@ -9,17 +9,16 @@ import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, merge
 import { kebabCase, toSafeInteger } from "lodash";
 import { AxiosError } from "axios";
 
-import { pluginApi } from "../plugin";
-import { httpRequest } from "../utils/fetch";
-import { isValidSubscriber } from "../auth/auth";
+import { fetch } from "../utils/fetch";
+import { pluginAuth } from "../auth/auth";
 import { encr } from "../utils/crypto";
 
 export function queue() {
 	return new Elysia({ prefix: "/queues" })
-		.use(pluginApi())
-		.onBeforeHandle(async ctx => {
-			return await isValidSubscriber(ctx);
+		.headers({
+			"X-XSS-Protection": "0"
 		})
+		.use(pluginAuth())
 		.state("queues", [] as Array<SafeQueue>)
 		.guard({
 			headers: t.Object({
@@ -53,6 +52,7 @@ export function queue() {
 
 			})
 			.patch("/:id/unsubscribe", ctx => {
+				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
 				if (index == -1) {
 					return ctx.error("Bad Request", {
@@ -70,6 +70,7 @@ export function queue() {
 				type: "json"
 			})
 			.delete("/:id", ctx => {
+				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const deleted = deleteQueue(ctx.db, ctx.params.id);
 				if (deleted == null) {
 					return ctx.error("Bad Request", {
@@ -95,6 +96,7 @@ export function queue() {
 			timeout: 30000
 		})
 		.post("/register", ctx => {
+			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 			ctx.set.status = "Created";
 			return registerQueue(ctx);
 		}, {
@@ -173,17 +175,17 @@ export function queue() {
 						default: null
 					}),
 					body: t.Optional(
-						t.Record(t.String({ maxLength: 128 }), t.String({ maxLength: 4096 }), {
+						t.Record(t.String({ minLength: 1, maxLength: 128 }), t.String({ minLength: 1, maxLength: 4096 }), {
 							default: null
 						})
 					),
 					query: t.Optional(
-						t.Record(t.String({ maxLength: 128 }), t.String({ maxLength: 4096 }), {
+						t.Record(t.String({ minLength: 1, maxLength: 128 }), t.String({ minLength: 1, maxLength: 4096 }), {
 							default: null
 						})
 					),
 					headers: t.Optional(
-						t.Record(t.String({ maxLength: 128 }), t.String({ maxLength: 4096 }), {
+						t.Record(t.String({ minLength: 1, maxLength: 128 }), t.String({ minLength: 1, maxLength: 4096 }), {
 							default: null
 						})
 					)
@@ -256,7 +258,6 @@ export function queue() {
 			response: {
 				201: t.Object({
 					id: t.String(),
-					configId: t.String(),
 					state: t.String({
 						default: "RUNNING"
 					}),
@@ -264,10 +265,10 @@ export function queue() {
 						default: 0
 					}),
 					estimateEndAt: t.Integer({
-						default: addMilliseconds(Date.now(), 666).getTime()
+						default: 0
 					}),
 					estimateExecutionAt: t.Integer({
-						default: addMilliseconds(Date.now(), 666).getTime()
+						default: 0
 					})
 				}),
 				400: t.Object({
@@ -304,7 +305,7 @@ export function queue() {
 }
 
 function isTasksInQueueReachTheLimit(db: Database, id: string) {
-	const q = db.query("SELECT 1 FROM subscriber WHERE subscriberId = ? AND tasksInQueue < tasksInQueueLimit;");
+	const q = db.query("SELECT 1 FROM subscriber WHERE subscriberId = ? AND tasksInQueue < tasksInQueueLimit LIMIT 1;");
 	const value = q.get(id) as { "1": 1 } | null;
 	q.finalize();
 	return !value;
@@ -338,7 +339,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 			switchMap(() => {
 				let additionalHeaders = {} as { [k: string]: string };
 				let estimateNextRetryAt = 0;
-				return defer(() => httpRequest(ctx.body, additionalHeaders)).pipe(
+				return defer(() => fetch(ctx.body, additionalHeaders)).pipe(
 					map(res => ({
 						data: res.data,
 						state: "DONE",
@@ -523,7 +524,7 @@ function registerQueue(ctx: SubscriptionContext) {
 		statusCode: 0,
 		estimateEndAt: 0,
 		estimateExecutionAt: estimateExecutionAt.getTime()
-	};
+	} as Queue;
 }
 
 function deleteQueue(db: Database, id: string) {
@@ -535,7 +536,7 @@ function deleteQueue(db: Database, id: string) {
 	return "Done";
 }
 
-function getConfig(db: Database) {
+function getConfig(db: Database, id: string) {
 	const q = db.query("SELECT * FROM config WHERE queueId IN (SELECT queueId FROM queue);");
 	const value = q.get();
 	q.finalize();
@@ -544,14 +545,20 @@ function getConfig(db: Database) {
 
 function getQueues(db: Database, id: string) {
 	const q = db.query("SELECT * FROM queue WHERE subscriberId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
-	const value = q.all(id) as Array<Queue> | null;
+	const value = q.all(id) as Array<{}> | null;
 	q.finalize();
 	return value;
 }
 
 function getQueue(db: Database, id: string) {
-	const q = db.query("SELECT * FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);");
-	const value = q.get(id) as Queue | null;
+	const q = db.query("SELECT state, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber) LIMIT 1;");
+	const value = q.get(id) as {} | null;
 	q.finalize();
-	return value;
+	if (value == null) {
+		return null;
+	}
+	return {
+		id,
+		...value
+	} as Queue;
 }

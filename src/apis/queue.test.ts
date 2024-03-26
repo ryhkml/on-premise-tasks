@@ -52,7 +52,7 @@ describe("Test API", () => {
 				}
 			});
 			expect(queue.status).toBe(200);
-			expect(queue.data).toHaveProperty("queueId");
+			expect(queue.data).toHaveProperty("id");
 			expect(queue.data).toHaveProperty("state");
 			expect(queue.data).toHaveProperty("statusCode");
 			expect(queue.data).toHaveProperty("estimateEndAt");

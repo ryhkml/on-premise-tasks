@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { decr, encr } from "./crypto";
 
-describe("TEST CRYPTO", () => {
+describe("Test CRYPTO", () => {
 	it("should encrypt the message", () => {
 		const key = Date.now().toString();
 		const message = "Hello world";

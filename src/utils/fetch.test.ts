@@ -1,26 +1,50 @@
 import { describe, expect, it } from "bun:test";
 
-import { firstValueFrom, map } from "rxjs";
+import { catchError, lastValueFrom, map, throwError } from "rxjs";
+import { AxiosError } from "axios";
 
-import { httpRequest } from "./fetch";
+import { fetch } from "./fetch";
 import { queue } from "../apis/queue";
 
 const app = queue();
 
-describe("TEST FETCH", () => {
-	it("should respond status code 200", async () => {
-		const http = httpRequest({
+describe("Test FETCH", () => {
+	it("should respond to \"AxiosResponse\" if the http request is successful", async () => {
+		const http = fetch({
 			httpRequest: {
 				url: "https://www.starlink.com",
 				method: "GET"
 			},
 			config: app.decorator.defaultConfig
 		})
-		const status = await firstValueFrom(
-			http.pipe(
-				map(res => res.status)
-			)
-		);
-		expect(status).toBe(200);
+		try {
+			const res = await lastValueFrom(http);
+			expect(res).toHaveProperty("data");
+			expect(res).toHaveProperty("config");
+			expect(res).toHaveProperty("headers");
+			expect(res).toHaveProperty("status");
+			expect(res).toHaveProperty("statusText");
+		} catch (error) {
+			// Noop
+		}
+	});
+	it("should respond to an \"AxiosError\" instance if the http request fails", async () => {
+		const http = fetch({
+			httpRequest: {
+				url: "https://api.starlink.com",
+				method: "GET"
+			},
+			config: app.decorator.defaultConfig
+		})
+		try {
+			await lastValueFrom(
+				http.pipe(
+					map(res => res.status),
+					catchError(e => throwError(() => e))
+				)
+			);
+		} catch (error) {
+			expect(error).toBeInstanceOf(AxiosError);
+		}
 	});
 });

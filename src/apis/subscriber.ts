@@ -5,17 +5,15 @@ import { Elysia, t } from "elysia";
 import { deburr } from "lodash";
 import { ulid } from "ulid";
 
-import { isValidSubscriber } from "../auth/auth";
-import { pluginApi } from "../plugin";
 import { tasksDb } from "../db";
+import { pluginAuth } from "../auth/auth";
 
 export function subscriber() {
 	return new Elysia({ prefix: "/subscribers" })
+		.headers({
+			"X-XSS-Protection": "0"
+		})
 		.guard({
-			async beforeHandle(ctx) {
-				// @ts-ignore
-				return await isValidSubscriber(ctx);
-			},
 			headers: t.Object({
 				"authorization": t.String(),
 				"x-tasks-subscriber-id": t.String()
@@ -28,7 +26,7 @@ export function subscriber() {
 				})
 			})
 		}, api => api
-			.use(pluginApi())
+			.use(pluginAuth())
 			.get("/:name", ctx => {
 				const subscriber = getSubscriber(ctx.db, ctx.id, ctx.params.name);
 				if (subscriber == null) {
@@ -67,7 +65,7 @@ export function subscriber() {
 						id: t.String(),
 						name: t.String(),
 						createdAt: t.Integer({
-							default: Date.now()
+							default: 0
 						}),
 						tasksInQueue: t.Integer({
 							default: 0
@@ -89,6 +87,7 @@ export function subscriber() {
 				type: "json"
 			})
 			.delete("/:name", ctx => {
+				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const isDeleted = deleteSubscriber(ctx.db, ctx.id, ctx.params.name);
 				if (isDeleted == null) {
 					return ctx.error("Bad Request", {
@@ -153,6 +152,7 @@ export function subscriber() {
 				createdAt: ctx.today,
 				key: secretKey
 			});
+			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 			ctx.set.status = "Created";
 			return {
 				id,
@@ -216,7 +216,7 @@ function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksI
 };
 
 function getSubscriber(db: Database, id: string, name: string) {
-	const q = db.query("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2;");
+	const q = db.query("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 LIMIT 1;");
 	const value = q.get(id, name) as Omit<SubscriberContext, "id" | "key"> | null;
 	q.finalize();
 	if (value == null) {
@@ -226,7 +226,7 @@ function getSubscriber(db: Database, id: string, name: string) {
 };
 
 function deleteSubscriber(db: Database, id: string, name: string) {
-	const q = db.query("SELECT tasksInQueue FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0;");
+	const q = db.query("SELECT tasksInQueue FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 LIMIT 1;");
 	const value = q.get(id, name) as Pick<SubscriberContext, "tasksInQueue"> | null;
 	q.finalize();
 	if (value == null) {

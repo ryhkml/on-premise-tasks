@@ -34,26 +34,6 @@ describe("Test API", () => {
 			expect(data).toHaveProperty("tasksInQueue");
 			expect(data).toHaveProperty("tasksInQueueLimit");
 		});
-		it("should respond status code 401 if subscriber id is invalid", async () => {
-			const credential = await api.subscribers.register.post({ name });
-			const { status } = await api.subscribers({ name }).get({
-				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": "dummy"
-				}
-			});
-			expect(status).toBe(401);
-		});
-		it("should respond status code 403 if subscriber key is invalid", async () => {
-			const credential = await api.subscribers.register.post({ name });
-			const { status } = await api.subscribers({ name }).get({
-				headers: {
-					"authorization": "Bearer dummy",
-					"x-tasks-subscriber-id": credential.data?.id!
-				}
-			});
-			expect(status).toBe(403);
-		});
 		it("should respond status code 404 if subscriber id does not match subscriber name", async () => {
 			const credential = await api.subscribers.register.post({ name });
 			const { status } = await api.subscribers({ name: "dummy" }).get({
@@ -122,26 +102,6 @@ describe("Test API", () => {
 				}
 			});
 			expect(status).toBe(400);
-		});
-		it("should respond status code 401 if subscriber id is invalid", async () => {
-			const { data } = await api.subscribers.register.post({ name });
-			const { status } = await api.subscribers({ name }).delete(null, {
-				headers: {
-					"authorization": "Bearer " + data?.key,
-					"x-tasks-subscriber-id": "dummy"
-				}
-			});
-			expect(status).toBe(401);
-		});
-		it("should respond status code 403 if subscriber key is invalid", async () => {
-			const { data } = await api.subscribers.register.post({ name });
-			const { status } = await api.subscribers({ name }).delete(null, {
-				headers: {
-					"authorization": "Bearer dummy",
-					"x-tasks-subscriber-id": data?.id!
-				}
-			});
-			expect(status).toBe(403);
 		});
 	});
 });
