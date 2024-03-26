@@ -85,7 +85,8 @@ export function subscriber() {
 					404: t.Object({
 						message: t.Literal("Subscriber not found")
 					})
-				}
+				},
+				type: "json"
 			})
 			.delete("/:name", ctx => {
 				const isDeleted = deleteSubscriber(ctx.db, ctx.id, ctx.params.name);
@@ -130,7 +131,8 @@ export function subscriber() {
 					403: t.Object({
 						message: t.String()
 					})
-				}
+				},
+				type: "json"
 			})
 		)
 		.decorate("db", tasksDb())

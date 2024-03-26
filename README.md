@@ -89,24 +89,27 @@ type TasksConfig = {
 }
 ```
 An example of requesting a Task
-
+```json
+// req.json
+{
+    "httpRequest": {
+        "url": "https://api.starlink.com",
+        "method": "GET"
+    },
+    "config": {
+        "executionDelay": 86400000,
+        "retry": 5,
+        "retryInterval": 3600000,
+        "retryExponential": false
+    }
+}
+```
 ```sh
 curl -X POST \
     -H "authorization: Bearer <KEY>" \
     -H "content-type: application/json" \
     -H "x-tasks-subscriber-id: <ID>" \
-    -d "{
-        "httpRequest": {
-            "url": "https://api.starlink.com",
-            "method": "GET"
-        },
-        "config": {
-            "executionDelay": 86400000,
-            "retry": 5,
-            "retryInterval": 3600000,
-            "retryExponential": false
-        }
-    }" \
+    -d @req.json \
     http://localhost:3200/queues/register
 ```
 
@@ -122,21 +125,24 @@ Retry-3, 3600000 * 3 = 10800000ms
 And so on...
 ```
 Additionally, you can make a specific request by using `executeAt`
-
+```json
+// req.json
+{
+    "httpRequest": {
+        "url": "https://api.starlink.com",
+        "method": "GET"
+    },
+    "config": {
+        "executeAt": 1710880762570
+    }
+}
+```
 ```sh
 curl -X POST \
     -H "authorization: Bearer <KEY>" \
     -H "content-type: application/json" \
     -H "x-tasks-subscriber-id: <ID>" \
-    -d "{
-        "httpRequest": {
-            "url": "https://api.starlink.com",
-            "method": "GET"
-        },
-        "config": {
-            "executeAt": 1710880762570
-        }
-    }" \
+    -d @req.json \
     http://localhost:3200/queues/register
 ```
 Please note that properties ending with `"At"` are in UNIX time format:
