@@ -43,18 +43,19 @@ bun bin
 
 ## API
 ### Subscriber
-- `GET /subscribers/:name`
-- `DELETE /subscribers/:name`
-- `POST /subscribers/register`
+- `GET /subscribers/:name` ✅
+- `DELETE /subscribers/:name` ✅
+- `POST /subscribers/register` ✅
 
 ### Queue
-- `GET /queues/:id`
-- `GET /queues/:id/config`
-- `DELETE /queues/:id`
-- `PATCH /queues/:id/pause`
-- `PATCH /queues/:id/resume`
-- `PATCH /queues/:id/unsubscribe`
-- `POST /queues/register`
+- `GET /queues/:id` ✅
+- `PATCH /queues/:id` ❌
+- `DELETE /queues/:id` ✅
+- `GET /queues/:id/config` ❌
+- `PATCH /queues/:id/pause` ❌
+- `PATCH /queues/:id/resume` ❌
+- `PATCH /queues/:id/unsubscribe` ✅
+- `POST /queues/register` ✅
 
 ### Types
 ```ts
