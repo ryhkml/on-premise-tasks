@@ -74,12 +74,6 @@ export function subscriber() {
 							default: 1000
 						})
 					}),
-					401: t.Object({
-						message: t.Literal("The request did not include valid authentication")
-					}),
-					403: t.Object({
-						message: t.Literal("The server did not accept valid authentication")
-					}),
 					404: t.Object({
 						message: t.Literal("Subscriber not found")
 					})
@@ -90,8 +84,8 @@ export function subscriber() {
 				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const isDeleted = deleteSubscriber(ctx.db, ctx.id, ctx.params.name);
 				if (isDeleted == null) {
-					return ctx.error("Bad Request", {
-						message: "A request includes an invalid credential or value"
+					return ctx.error("Unprocessable Content", {
+						message: "The request did not meet one of it's preconditions"
 					});
 				}
 				ctx.set.status = "OK";
@@ -121,13 +115,7 @@ export function subscriber() {
 					200: t.Object({
 						message: t.Literal("Done")
 					}),
-					400: t.Object({
-						message: t.String()
-					}),
-					401: t.Object({
-						message: t.String()
-					}),
-					403: t.Object({
+					422: t.Object({
 						message: t.String()
 					})
 				},
@@ -188,9 +176,6 @@ export function subscriber() {
 					}))
 				}),
 				409: t.Object({
-					message: t.String()
-				}),
-				500: t.Object({
 					message: t.String()
 				})
 			},

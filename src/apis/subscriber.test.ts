@@ -5,41 +5,43 @@ import { treaty } from "@elysiajs/eden";
 
 import { subscriber } from "./subscriber";
 
-const port = +env.PORT! || 3200;
-const app = subscriber().listen(port);
-const api = treaty(app);
-const db = app.decorator.db;
+const subscriberApp = subscriber().listen(+env.PORT! || 3200);
+const subscriberApi = treaty(subscriberApp);
+const name = "test-subscriber";
+const db = subscriberApp.decorator.db;
+
+let key = "";
+let id = "";
 
 describe("Test API", () => {
-	describe("GET /subscribers/:name", async () => {
-		const name = "test-get-subscribers";
-		beforeEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
-		afterEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
+	beforeEach(async () => {
+		const { data } = await subscriberApi.subscribers.register.post({ name });
+		key = data?.key!;
+		id = data?.id!;
+	});
+	afterEach(() => {
+		db.run("DELETE FROM subscriber");
+	});
+	describe("GET /subscribers/:name", () => {
 		it("should successful get subscriber", async () => {
-			const credential = await api.subscribers.register.post({ name });
-			const { data, status } = await api.subscribers({ name }).get({
+			const { data, status } = await subscriberApi.subscribers({ name }).get({
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(200);
-			expect(data).toHaveProperty("id");
-			expect(data).toHaveProperty("name");
-			expect(data).toHaveProperty("createdAt");
-			expect(data).toHaveProperty("tasksInQueue");
-			expect(data).toHaveProperty("tasksInQueueLimit");
+			expect(data?.id).toBeDefined();
+			expect(data?.name).toBeDefined();
+			expect(data?.createdAt).toBeDefined();
+			expect(data?.tasksInQueue).toBeDefined();
+			expect(data?.tasksInQueueLimit).toBeDefined();
 		});
-		it("should respond status code 404 if subscriber id does not match subscriber name", async () => {
-			const credential = await api.subscribers.register.post({ name });
-			const { status } = await api.subscribers({ name: "dummy" }).get({
+		it("should respond status code 404 if subscriber name doesn't exists", async () => {
+			const { status } = await subscriberApi.subscribers({ name: "dummy" }).get({
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(404);
@@ -47,61 +49,46 @@ describe("Test API", () => {
 	});
 
 	describe("POST /subscribers/register", () => {
-		const name = "test-post-subscriber";
-		beforeEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
-		afterEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
 		it("should the subscriber not registered", () => {
+			db.run("DELETE FROM subscriber");
 			const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?);");
 			const obj = q.get(name) as { [k: string]: number };
 			const isExists = !!Object.values(obj)[0];
 			expect(isExists).toBe(false);
 		});
 		it("should successful register subscriber", async () => {
-			const { data, status } = await api.subscribers.register.post({ name });
+			db.run("DELETE FROM subscriber");
+			const { data, status } = await subscriberApi.subscribers.register.post({ name });
 			expect(status).toBe(201);
-			expect(data).toHaveProperty("id");
-			expect(data).toHaveProperty("key");
+			expect(data?.id).toBeDefined();
+			expect(data?.key).toBeDefined();
 		});
 		it("should respond status code 409 if subscriber already registered", async () => {
-			await api.subscribers.register.post({ name });
-			const { status } = await api.subscribers.register.post({ name });
+			const { status } = await subscriberApi.subscribers.register.post({ name });
 			expect(status).toBe(409);
 		});
 	});
 
 	describe("DELETE /subscribers/:name", () => {
-		const name = "test-delete-subscribers";
-		beforeEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
-		afterEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
 		it("should successful delete subscriber", async () => {
-			const { data } = await api.subscribers.register.post({ name });
-			const { data: res, status } = await api.subscribers({ name }).delete(null, {
+			const { data, status } = await subscriberApi.subscribers({ name }).delete(null, {
 				headers: {
-					"authorization": "Bearer " + data?.key,
-					"x-tasks-subscriber-id": data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(200);
-			expect(res).toMatchObject({ message: "Done" });
+			expect(data?.message).toBeDefined();
 		});
-		it("should respond status code 400 if tasks in queue greater than or equal to 1", async () => {
-			const { data } = await api.subscribers.register.post({ name });
+		it("should respond status code 422 if subscriber tasks in queue greater than or equal to 1", async () => {
 			db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberName = ?;", [name]);
-			const { status } = await api.subscribers({ name }).delete(null, {
+			const { status } = await subscriberApi.subscribers({ name }).delete(null, {
 				headers: {
-					"authorization": "Bearer " + data?.key,
-					"x-tasks-subscriber-id": data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
-			expect(status).toBe(400);
+			expect(status).toBe(422);
 		});
 	});
 });

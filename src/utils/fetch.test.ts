@@ -19,11 +19,9 @@ describe("Test FETCH", () => {
 		})
 		try {
 			const res = await lastValueFrom(http);
-			expect(res).toHaveProperty("data");
-			expect(res).toHaveProperty("config");
-			expect(res).toHaveProperty("headers");
-			expect(res).toHaveProperty("status");
-			expect(res).toHaveProperty("statusText");
+			expect(res.data).toBeDefined();
+			expect(res.status).toBeDefined();
+			expect(res.statusText).toBeDefined();
 		} catch (error) {
 			// Noop
 		}

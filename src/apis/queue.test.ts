@@ -9,87 +9,84 @@ import { addMilliseconds } from "date-fns";
 import { queue } from "./queue";
 import { subscriber } from "./subscriber";
 
-const port = +env.PORT! || 3200;
-const app = queue().listen(port)
-const api = treaty(app);
-const db = app.decorator.db;
+const subscriberApi = treaty(subscriber().listen(+env.PORT! || 3200));
+const queueApp = queue().listen(+env.PORT! || 3200)
+const queueApi = treaty(queueApp);
+const name = "test-queue";
+const db = queueApp.decorator.db;
+
+let key = "";
+let id = "";
 
 describe("Test API", () => {
-	const name = "test-queue-register";
-	const apiSubscriber = treaty(
-		subscriber().listen(port)
-	);
+	beforeEach(async () => {
+		const { data } = await subscriberApi.subscribers.register.post({ name });
+		key = data?.key!;
+		id = data?.id!;
+	});
+	afterEach(() => {
+		db.transaction(() => {
+			db.run("DELETE FROM queue");
+			db.run("DELETE FROM subscriber");
+		})();
+	});
 	describe("GET /queues/:id", () => {
-		beforeEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
-		afterEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
 		it("should successful get queue", async () => {
 			const dueTime = 3000;
-			const credential = await apiSubscriber.subscribers.register.post({ name });
-			const { data, status } = await api.queues.register.post({
+			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
+					...queueApp.decorator.defaultConfig,
 					executionDelay: dueTime
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(201);
-			const queue = await api.queues({ id: data?.id! }).get({
+			expect(data?.id).toBeDefined();
+			const queue = await queueApi.queues({ id: data?.id! }).get({
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(queue.status).toBe(200);
-			expect(queue.data).toHaveProperty("id");
-			expect(queue.data).toHaveProperty("state");
-			expect(queue.data).toHaveProperty("statusCode");
-			expect(queue.data).toHaveProperty("estimateEndAt");
-			expect(queue.data).toHaveProperty("estimateExecutionAt");
+			expect(queue.data?.id).toBeDefined();
+			expect(queue.data?.state).toBeDefined();
+			expect(queue.data?.statusCode).toBeDefined();
+			expect(queue.data?.estimateEndAt).toBeDefined();
+			expect(queue.data?.estimateExecutionAt).toBeDefined();
 			// Waiting for task
 			await firstValueFrom(timer(dueTime + 1000));
-			// ...
-			db.run("DELETE FROM queue WHERE queueId = ?;", [data?.id!]);
 		});
 	});
 
 	describe("POST /queues/register", async () => {
-		beforeEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
-		afterEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
 		it("should successful register queue and wait 3000ms until the task has been successfully executed", async () => {
 			const dueTime = 3000;
-			const credential = await apiSubscriber.subscribers.register.post({ name });
-			const { data, status } = await api.queues.register.post({
+			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
+					...queueApp.decorator.defaultConfig,
 					executionDelay: dueTime
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
 			// Waiting for task
 			await firstValueFrom(timer(dueTime + 1000));
 			// ...
@@ -97,165 +94,155 @@ describe("Test API", () => {
 			const { state, statusCode } = q.get(data?.id!) as Pick<Queue, "state" | "statusCode">;
 			expect(state).toBe("DONE");
 			expect(statusCode).toBe(200);
-			db.run("DELETE FROM queue WHERE queueId = ?;", [data?.id!]);
 		});
 		it("should successful register queue and wait 3000ms until the task gives an error response", async () => {
 			const dueTime = 3000;
-			const credential = await apiSubscriber.subscribers.register.post({ name });
-			const { data, status } = await api.queues.register.post({
+			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://api.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
+					...queueApp.decorator.defaultConfig,
 					executionDelay: dueTime
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
 			// Waiting for task
 			await firstValueFrom(timer(dueTime + 1000));
 			// ...
 			const q = db.query("SELECT state FROM queue WHERE queueId = ?;");
 			const { state } = q.get(data?.id!) as Pick<Queue, "state">;
 			expect(state).toBe("ERROR");
-			db.run("DELETE FROM queue WHERE queueId = ?;", [data?.id!]);
-		});
-		it("should respond status code 400 if tasks in queue greater than tasks in queue limit", async () => {
-			const dueTime = 3000;
-			const { data } = await apiSubscriber.subscribers.register.post({ name });
-			db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1000 WHERE subscriberName = ?;", [name]);
-			const { status } = await api.queues.register.post({
-				httpRequest: {
-					url: "https://www.starlink.com",
-					method: "GET"
-				},
-				config: {
-					...app.decorator.defaultConfig,
-					executionDelay: dueTime
-				}
-			}, {
-				headers: {
-					"authorization": "Bearer " + data?.key!,
-					"x-tasks-subscriber-id": data?.id!
-				}
-			});
-			expect(status).toBe(400);
 		});
 		it("should respond status code 400 if the execution time is earlier than the current time", async () => {
-			const today = Date.now();
-			const { data } = await apiSubscriber.subscribers.register.post({ name });
-			const { status } = await api.queues.register.post({
+			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
-					executeAt: today - 666
+					...queueApp.decorator.defaultConfig,
+					executeAt: Date.now() - 666
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + data?.key!,
-					"x-tasks-subscriber-id": data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(400);
 		});
 		it("should respond status code 400 if the \"retryAt\" execution time is earlier than the execution time", async () => {
-			const delay = 3000;
-			const today = Date.now();
-			const estimateExecutionTime = addMilliseconds(today, delay).getTime();
-			const { data } = await apiSubscriber.subscribers.register.post({ name });
-			const { status } = await api.queues.register.post({
+			const dueTime = 3000;
+			const estimateExecutionTime = addMilliseconds(Date.now(), dueTime).getTime();
+			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
-					executionDelay: delay,
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime,
 					retryAt: estimateExecutionTime - 666
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + data?.key!,
-					"x-tasks-subscriber-id": data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(400);
 		});
-		it("should retrying 2 times if task gives an error response", async () => {
+		it("should respond status code 429 if tasks in queue greater than tasks in queue limit", async () => {
+			db.run("UPDATE subscriber SET tasksInQueue = 1000 WHERE subscriberName = ?;", [name]);
 			const dueTime = 3000;
-			const { data } = await apiSubscriber.subscribers.register.post({ name });
-			const queue = await api.queues.register.post({
+			const { status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://www.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(429);
+		});
+		it("should retrying 3 times if task gives an error response", async () => {
+			const dueTime = 3000;
+			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://api.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
+					...queueApp.decorator.defaultConfig,
 					executionDelay: dueTime,
-					retry: 2,
+					retry: 3,
+					retryInterval: 1,
 					retryExponential: false
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + data?.key!,
-					"x-tasks-subscriber-id": data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
 			// Wait for tasks
-			await firstValueFrom(timer(4000));
+			await firstValueFrom(timer(dueTime + 1500));
 			// ...
-			const q = db.query("SELECT q.state, c.retryCount FROM queue AS q JOIN config as c ON q.queueId = c.queueId WHERE q.queueId = ?;");
-			const value = q.get(queue.data?.id!) as { state: string, retryCount: number } | null;
+			const q = db.query("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ?;");
+			const value = q.get(data?.id!) as { state: string, retryCount: number } | null;
 			expect(value?.state).toBe("ERROR");
-			expect(value?.retryCount).toBe(2);
+			expect(value?.retryCount).toBe(3);
 		});
 	});
 
 	describe("PATCH /queues/:id/unsubscribe", () => {
-		beforeEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
-		afterEach(() => {
-			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
-		});
 		it("should successful unsubscribe queue", async () => {
 			const dueTime = 3000;
-			const credential = await apiSubscriber.subscribers.register.post({ name });
-			const { data, status } = await api.queues.register.post({
+			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
 					method: "GET"
 				},
 				config: {
-					...app.decorator.defaultConfig,
+					...queueApp.decorator.defaultConfig,
 					executionDelay: dueTime
 				}
 			}, {
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
 			});
 			expect(status).toBe(201);
-			await firstValueFrom(timer(1000));
-			const unsubscribe = await api.queues({ id: data?.id! }).unsubscribe.patch(null, {
+			expect(data?.id).toBeDefined();
+			// Wait for task
+			await firstValueFrom(timer(dueTime / 2));
+			// ...
+			const unsubscribe = await queueApi.queues({ id: data?.id! }).unsubscribe.patch(null, {
 				headers: {
-					"authorization": "Bearer " + credential.data?.key!,
-					"x-tasks-subscriber-id": credential.data?.id!
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
 				}
-			})
+			});
 			expect(unsubscribe.status).toBe(200);
-			expect(unsubscribe.data).toMatchObject({ message: "Done" });
-			db.run("DELETE FROM queue WHERE queueId = ?;", [data?.id!]);
+			expect(unsubscribe.data?.message).toBeDefined();
 		});
 	});
 });

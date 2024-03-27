@@ -11,8 +11,6 @@ declare global {
 		tasksInQueueLimit: number;
 	}
 
-	type TaskResponseType = "TEXT" | "JSON";
-
 	type TaskHttp = {
 		url: string;
 		method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -53,6 +51,31 @@ declare global {
 
 	type SafeQueue = {
 		id: string;
-		subscription: Subscription | null;
+		subscription: Subscription;
+	}
+
+	type Config = {
+		configId: string;
+		queueId: string;
+		url: string;
+		method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+		bodyStringify: string | null;
+		queryStringify: string | null;
+		headersStringify: string | null;
+		executionDelay: number;
+		executeAt: number;
+		retry: number;
+		retryAt: number;
+		retrying: number;
+		retryCount: number;
+		retryLimit: number;
+		retryInterval: number;
+		/**
+		 * Parse => number[]
+		*/
+		retryStatusCode: string;
+		retryExponential: number;
+		estimateNextRetryAt: number;
+		timeout: number;
 	}
 }
