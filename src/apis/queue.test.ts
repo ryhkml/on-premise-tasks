@@ -30,6 +30,7 @@ describe("Test API", () => {
 			db.run("DELETE FROM subscriber");
 		})();
 	});
+	
 	describe("GET /queues/:id", () => {
 		it("should successful get queue", async () => {
 			const dueTime = 3000;
@@ -243,6 +244,83 @@ describe("Test API", () => {
 			});
 			expect(unsubscribe.status).toBe(200);
 			expect(unsubscribe.data?.message).toBeDefined();
+		});
+	});
+
+	describe("DELETE /queues/:id", () => {
+		it("should successful delete queue", async () => {
+			const dueTime = 3000;
+			const { data, status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://www.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
+			// Waiting for task
+			await firstValueFrom(timer(dueTime + 1000));
+			// ...
+			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				},
+				query: {
+
+				}
+			});
+			expect(deleted.status).toBe(200);
+			expect(deleted.data?.message).toBeDefined();
+			const q = db.query("SELECT * FROM queue WHERE queueId = ?;");
+			const queue = q.get(data?.id!) as Queue | null;
+			expect(queue).toBe(null);
+		});
+		it("should successful force delete queue", async () => {
+			const dueTime = 3000;
+			const { data, status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://www.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
+			// Waiting for task
+			await firstValueFrom(timer(1000));
+			// ...
+			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				},
+				query: {
+					force: 1
+				}
+			});
+			expect(deleted.status).toBe(200);
+			expect(deleted.data?.message).toBeDefined();
+			const q = db.query("SELECT * FROM queue WHERE queueId = ?;");
+			const queue = q.get(data?.id!) as Queue | null;
+			expect(queue).toBe(null);
 		});
 	});
 });

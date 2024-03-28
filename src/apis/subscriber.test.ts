@@ -22,6 +22,7 @@ describe("Test API", () => {
 	afterEach(() => {
 		db.run("DELETE FROM subscriber");
 	});
+	
 	describe("GET /subscribers/:name", () => {
 		it("should successful get subscriber", async () => {
 			const { data, status } = await subscriberApi.subscribers({ name }).get({

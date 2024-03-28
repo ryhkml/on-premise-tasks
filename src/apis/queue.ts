@@ -142,16 +142,25 @@ export function queue() {
 					message: "Done"
 				};
 			}, {
-				query: t.Object({
-					force: t.Optional(
-						t.Union([
-							t.Literal(0),
-							t.Literal(1)
-						], {
-							default: 0
-						})
-					)
-				}),
+				transform(ctx) {
+					if ("force" in ctx.query) {
+						ctx.query.force = toSafeInteger(ctx.query.force) as 0 | 1;
+					} else {
+						ctx.query["force"] = 0;
+					}
+				},
+				query: t.Optional(
+					t.Object({
+						force: t.Optional(
+							t.Union([
+								t.Literal(0),
+								t.Literal(1)
+							], {
+								default: 0
+							})
+						)
+					})
+				),
 				response: {
 					200: t.Object({
 						message: t.String()
