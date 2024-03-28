@@ -6,7 +6,7 @@ import { AxiosError } from "axios";
 import { fetch } from "./fetch";
 import { queue } from "../apis/queue";
 
-const app = queue();
+const queueApp = queue();
 
 describe("Test FETCH", () => {
 	it("should respond to \"AxiosResponse\" if the http request is successful", async () => {
@@ -15,7 +15,7 @@ describe("Test FETCH", () => {
 				url: "https://www.starlink.com",
 				method: "GET"
 			},
-			config: app.decorator.defaultConfig
+			config: queueApp.decorator.defaultConfig
 		})
 		try {
 			const res = await lastValueFrom(http);
@@ -32,7 +32,7 @@ describe("Test FETCH", () => {
 				url: "https://api.starlink.com",
 				method: "GET"
 			},
-			config: app.decorator.defaultConfig
+			config: queueApp.decorator.defaultConfig
 		})
 		try {
 			await lastValueFrom(

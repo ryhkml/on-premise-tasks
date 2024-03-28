@@ -4,8 +4,8 @@ import { randomBytes } from "node:crypto";
 
 import { Context, Elysia, t } from "elysia";
 
-import { addMilliseconds, differenceInMilliseconds, isBefore } from "date-fns";
-import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, tap, throwError, timer } from "rxjs";
+import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
+import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
 import { kebabCase, toSafeInteger } from "lodash";
 import { AxiosError } from "axios";
 
@@ -61,13 +61,13 @@ export function queue() {
 			.patch("/:id/pause", ctx => {
 				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
-				if (index == -1) {
+				const pause = pauseQueue(ctx.db, ctx.params.id);
+				if (index == -1 || pause == null) {
 					return ctx.error("Unprocessable Content", {
 						message: "The request did not meet one of it's preconditions"
 					});
 				}
 				ctx.store.queues[index].subscription.unsubscribe();
-				pauseQueue(ctx.db, ctx.params.id);
 				return {
 					message: "Done"
 				};
@@ -92,7 +92,7 @@ export function queue() {
 				// @ts-ignore
 				pushSubscription({ ...ctx, body: resume.body }, resume.dueTime, resume.queueId, resume.configId);
 				return {
-					message: "Done"
+					message: "Running"
 				};
 			}, {
 				response: {
@@ -132,7 +132,7 @@ export function queue() {
 					ctx.store.queues[index].subscription.unsubscribe();
 					unsubscribeQueue(ctx.db, ctx.id, ctx.params.id);
 				}
-				const deleted = deleteQueue(ctx.db, ctx.params.id);
+				const deleted = deleteQueue(ctx.db, ctx.params.id, !!ctx.query.force);
 				if (deleted == null) {
 					return ctx.error("Unprocessable Content", {
 						message: "The request did not meet one of it's preconditions"
@@ -149,18 +149,16 @@ export function queue() {
 						ctx.query["force"] = 0;
 					}
 				},
-				query: t.Optional(
-					t.Object({
-						force: t.Optional(
-							t.Union([
-								t.Literal(0),
-								t.Literal(1)
-							], {
-								default: 0
-							})
-						)
-					})
-				),
+				query: t.Object({
+					force: t.Optional(
+						t.Union([
+							t.Literal(0),
+							t.Literal(1)
+						], {
+							default: 0
+						})
+					)
+				}),
 				response: {
 					200: t.Object({
 						message: t.String()
@@ -396,10 +394,11 @@ function isTasksInQueueReachTheLimit(db: Database, id: string) {
 }
 
 function unsubscribeQueue(db: Database, id: string, queueId: string) {
+	const unsubscribeAt = Date.now();
 	db.transaction(() => {
 		db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [id]);
 		db.run("UPDATE queue SET state = 'DONE', statusCode = 0, estimateEndAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
-			Date.now(),
+			unsubscribeAt,
 			queueId
 		]);
 	})();
@@ -408,74 +407,98 @@ function unsubscribeQueue(db: Database, id: string, queueId: string) {
 interface ResumeQueue extends Pick<Queue, "estimateEndAt" | "estimateExecutionAt">, Config {}
 
 function resumeQueue(db: Database, queueId: string) {
-	const q = db.query("SELECT q.estimateEndAt, q.estimateExecutionAt, * FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ? AND q.state = 'PAUSED';");
-	const value = q.get(queueId) as ResumeQueue | null;
-	if (value == null) {
+	const resumeAt = Date.now();
+	const q = db.query("SELECT q.estimateEndAt, q.estimateExecutionAt, c.* FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ? AND q.state = 'PAUSED';");
+	const queue = q.get(queueId) as ResumeQueue | null;
+	if (queue == null) {
 		return null;
 	}
-	const key = kebabCase(db.filename) + ":" + value.configId;
+	const key = kebabCase(db.filename) + ":" + queue.configId;
 	const body = {
 		httpRequest: {
-			url: decr(value.url, key),
-			method: value.method,
-			body: !!value.bodyStringify
-				? JSON.parse(decr(value.bodyStringify, key))
+			url: decr(queue.url, key),
+			method: queue.method,
+			body: !!queue.bodyStringify
+				? JSON.parse(decr(queue.bodyStringify, key))
 				: undefined,
-			query: !!value.queryStringify
-				? JSON.parse(decr(value.queryStringify, key))
+			query: !!queue.queryStringify
+				? JSON.parse(decr(queue.queryStringify, key))
 				: undefined,
-			headers: !!value.headersStringify
-				? JSON.parse(decr(value.headersStringify, key))
+			headers: !!queue.headersStringify
+				? JSON.parse(decr(queue.headersStringify, key))
 				: undefined
 		},
 		config: {
-			executionDelay: value.executionDelay,
-			executeAt: value.executeAt,
-			retry: value.retry,
-			retryAt: value.retryAt,
-			retryInterval: value.retryInterval,
-			retryStatusCode: JSON.parse(value.retryStatusCode),
-			retryExponential: !!value.retryExponential,
-			timeout: value.timeout
+			executionDelay: queue.executionDelay,
+			executeAt: queue.executeAt,
+			retry: queue.retry,
+			retryAt: queue.retryAt,
+			retryInterval: queue.retryInterval,
+			retryStatusCode: JSON.parse(queue.retryStatusCode),
+			retryExponential: !!queue.retryExponential,
+			timeout: queue.timeout
 		}
 	} as TaskSubscriberRequest;
-	const today = Date.now();
-	if (value.executeAt) {
-		const diffMs = Math.abs(
-			differenceInMilliseconds(value.estimateExecutionAt, value.estimateEndAt)
-		);
-		body.config.executeAt = addMilliseconds(today, diffMs).getTime();
+	if (queue.executeAt) {
+		if (queue.retrying) {
+			if (queue.retryAt == 0) {
+				body.config.retry = queue.retryLimit - queue.retryCount;
+			}
+			const delay = Math.abs(
+				differenceInMilliseconds(queue.estimateNextRetryAt, queue.estimateEndAt)
+			);
+			body.config.executeAt = addMilliseconds(resumeAt, delay).getTime();
+		} else {
+			const diffMs = Math.abs(
+				differenceInMilliseconds(queue.estimateExecutionAt, queue.estimateEndAt)
+			);
+			body.config.executeAt = addMilliseconds(resumeAt, diffMs).getTime();
+		}
 	} else {
-		const diffMs = Math.abs(
-			differenceInMilliseconds(value.estimateExecutionAt, value.estimateEndAt)
-		);
-		body.config.executionDelay = diffMs;
+		if (queue.retrying) {
+			if (queue.retryAt == 0) {
+				body.config.retry = queue.retryLimit - queue.retryCount;
+			}
+			const delay = Math.abs(
+				differenceInMilliseconds(queue.estimateNextRetryAt, queue.estimateEndAt)
+			);
+			body.config.executionDelay = delay;
+		} else {
+			const diffMs = Math.abs(
+				differenceInMilliseconds(queue.estimateExecutionAt, queue.estimateEndAt)
+			);
+			body.config.executionDelay = diffMs;
+		}
 	}
-	if (value.retrying) {
-		body.config.retry = value.retry - value.retryCount;
-	}
-	const estimateExecutionAt = !!body.config.executeAt
-		? body.config.executeAt
-		: addMilliseconds(today, body.config.executionDelay).getTime();
+	const resumeDueTime = !!body.config.executeAt
+		? new Date(body.config.executeAt)
+		: body.config.executionDelay;
+	const estimateExecutionAt = typeof resumeDueTime === "number"
+		? addMilliseconds(resumeAt, resumeDueTime).getTime()
+		: resumeDueTime.getTime();
 	db.run("UPDATE queue SET state = 'RUNNING', estimateEndAt = 0, estimateExecutionAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 		estimateExecutionAt,
 		queueId
 	]);
 	return {
-		dueTime: !!body.config.executeAt
-			? new Date(body.config.executeAt)
-			: body.config.executionDelay,
+		dueTime: resumeDueTime,
 		queueId,
-		configId: value.configId,
+		configId: queue.configId,
 		body
 	};
 }
 
 function pauseQueue(db: Database, queueId: string) {
+	const pauseAt = Date.now();
+	const value = getQueue(db, queueId);
+	if (value == null) {
+		return null;
+	}
 	db.run("UPDATE queue SET state = 'PAUSED', estimateEndAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
-		Date.now(),
+		pauseAt,
 		queueId
 	]);
+	return "Done";
 }
 
 interface SubscriptionContext extends Context {
@@ -495,7 +518,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 		subscription: timer(dueTime).pipe(
 			switchMap(() => {
 				let additionalHeaders = {} as { [k: string]: string };
-				let estimateNextRetryAt = 0;
+				let stateMs = 0;
 				return defer(() => fetch(ctx.body, additionalHeaders)).pipe(
 					map(res => ({
 						data: res.data,
@@ -505,63 +528,75 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 					})),
 					catchError(error => {
 						if (error instanceof AxiosError) {
-							const errorStatus = toSafeInteger(error.response?.status);
-							const someErrorStatus = ctx.body.config.retryStatusCode.some(status => status == errorStatus);
-							if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatus) {
-								if (ctx.body.config.retryAt) {
-									ctx.db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
-										ctx.body.config.retryAt,
-										configId
-									]);
-								} else {
-									if (estimateNextRetryAt == 0) {
-										estimateNextRetryAt = addMilliseconds(Date.now(), ctx.body.config.retryInterval).getTime()
-									}
-									ctx.db.run("UPDATE config SET retrying = 1, estimateNextRetryAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
-										estimateNextRetryAt,
-										configId
-									]);
-								}
-								return throwError(() => ({
-									status: errorStatus
-								}));
-							}
-							return of({
+							const errorStatusCode = toSafeInteger(error.response?.status) || 500;
+							const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == errorStatusCode);
+							const errorResponse = {
 								data: null,
 								state: "ERROR",
-								status: errorStatus,
-								statusText: error.response?.statusText || ""
-							});
+								status: errorStatusCode,
+								statusText: error.response?.statusText || "Unknown"
+							};
+							if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatusCode) {
+								return throwError(() => errorResponse);
+							}
+							return of(errorResponse);
 						}
 						return throwError(() => ({
-							status: 500
-						}))
+							data: null,
+							status: 500,
+							state: "ERROR",
+							statusText: "Internal Server Error"
+						}));
 					}),
 					retry({
 						count: ctx.body.config.retry,
-						delay(_, count) {
-							const errorDueTime = ctx.body.config.retryExponential
-								? ctx.body.config.retryInterval * count
-								: ctx.body.config.retryInterval;
-							const errorTap = () => {
-								estimateNextRetryAt = addMilliseconds(Date.now(), errorDueTime).getTime();
-								additionalHeaders = {
-									...additionalHeaders,
-									"X-Tasks-Queue-Id": queueId,
-									"X-Tasks-Retry-Limit": ctx.body.config.retry.toString(),
-									"X-Tasks-Retry-Count": count.toString(),
-									"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
-								};
-								if (ctx.body.config.retry == count) {
-									delete additionalHeaders["X-Tasks-Estimate-Next-Retry-At"];
-								}
-								ctx.db.run("UPDATE config SET retryCount = retryCount + 1, headersStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
-									encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + configId),
-									configId
-								]);
-							}
-							return timer(errorDueTime).pipe(
-								tap(() => errorTap())
+						delay() {
+							const retryingAt = Date.now();
+							ctx.db.run("UPDATE config SET retrying = 1, retryCount = retryCount + 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
+							const qSource$ = defer(() => {
+								const q = ctx.db.query("SELECT retryCount, retryLimit FROM config WHERE configId = ? LIMIT 1;");
+								const { retryCount, retryLimit } = q.get(configId) as Pick<Config, "retryCount" | "retryLimit">;
+								q.finalize();
+								return of({ retryCount, retryLimit });
+							});
+							return qSource$.pipe(
+								switchMap(({ retryCount, retryLimit }) => {
+									let errorDueTime = 0 as number | Date;
+									let estimateNextRetryAt = 0;
+									if (ctx.body.config.retryAt) {
+										errorDueTime = new Date(ctx.body.config.retryAt);
+										estimateNextRetryAt = ctx.body.config.retryAt;
+									} else {
+										errorDueTime = ctx.body.config.retryExponential
+											? ctx.body.config.retryInterval * retryCount
+											: ctx.body.config.retryInterval;
+										estimateNextRetryAt = addMilliseconds(retryingAt, errorDueTime).getTime();
+									}
+									additionalHeaders = {
+										...additionalHeaders,
+										"X-Tasks-Queue-Id": queueId,
+										"X-Tasks-Retry-Count": retryCount.toString(),
+										"X-Tasks-Retry-Limit": retryLimit.toString(),
+										"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
+									};
+									ctx.db.run("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE configId = ?3 AND queueId IN (SELECT queueId FROM queue);", [
+										encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + configId),
+										estimateNextRetryAt,
+										configId
+									]);
+									// Debug
+									if (typeof errorDueTime === "number") {
+										stateMs += errorDueTime;
+									} else {
+										stateMs = new Date(errorDueTime).getTime();
+									}
+									// console.error();
+									// console.error("COUNT", retryCount);
+									// console.error("INTERVAL", millisecondsToSeconds(stateMs) + "sec");
+									// console.error("RETRY UTC", new Date(estimateNextRetryAt).toLocaleString());
+									// 
+									return timer(errorDueTime);
+								})
 							);
 						}
 					})
@@ -571,28 +606,34 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 		)
 		.subscribe({
 			next(res) {
+				const doneAt = Date.now();
 				ctx.db.transaction(() => {
 					ctx.db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [ctx.id]);
 					ctx.db.run("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 						res.state,
 						res.status,
-						Date.now(),
+						doneAt,
 						queueId
 					]);
 					ctx.db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 				})();
+				// console.log();
+				// console.log("DONE", queueId);
 			},
 			error(error) {
+				const errorAt = Date.now();
 				ctx.db.transaction(() => {
 					ctx.db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [ctx.id]);
 					ctx.db.run("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 						"ERROR",
 						error.status,
-						Date.now(),
+						errorAt,
 						queueId
 					]);
 					ctx.db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 				})();
+				// console.error();
+				// console.error("ERROR", queueId);
 			}
 		})
 	});
@@ -606,15 +647,15 @@ function registerQueue(ctx: SubscriptionContext) {
 		? new Date(ctx.body.config.executeAt)
 		: ctx.body.config.executionDelay;
 	const estimateExecutionAt = typeof dueTime === "number"
-		? addMilliseconds(ctx.today, dueTime)
-		: dueTime;
+		? addMilliseconds(ctx.today, dueTime).getTime()
+		: dueTime.getTime();
 	pushSubscription(ctx, dueTime, queueId, configId);
 	ctx.db.transaction(() => {
 		ctx.db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberId = ?;", [ctx.id]);
 		ctx.db.run("INSERT INTO queue (queueId, subscriberId, estimateExecutionAt) VALUES (?1, ?2, ?3);", [
 			queueId,
 			ctx.id,
-			estimateExecutionAt.getTime()
+			estimateExecutionAt
 		]);
 		ctx.db.run("INSERT INTO config (configId, queueId, url, method, timeout) VALUES (?1, ?2, ?3, ?4, ?5);", [
 			configId,
@@ -682,13 +723,13 @@ function registerQueue(ctx: SubscriptionContext) {
 		state: "RUNNING",
 		statusCode: 0,
 		estimateEndAt: 0,
-		estimateExecutionAt: estimateExecutionAt.getTime()
+		estimateExecutionAt
 	} as Queue;
 }
 
-function deleteQueue(db: Database, id: string) {
+function deleteQueue(db: Database, id: string, force = false) {
 	const queue = getQueue(db, id);
-	if (queue == null) {
+	if (queue == null || (queue.state != "DONE" && !force)) {
 		return null;
 	}
 	db.run("DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);", [id]);

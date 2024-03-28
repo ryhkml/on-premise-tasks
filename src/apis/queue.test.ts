@@ -26,8 +26,8 @@ describe("Test API", () => {
 	});
 	afterEach(() => {
 		db.transaction(() => {
-			db.run("DELETE FROM queue");
-			db.run("DELETE FROM subscriber");
+			db.run("DELETE FROM queue WHERE subscriberId = ?;", [id]);
+			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
 		})();
 	});
 	
@@ -68,7 +68,7 @@ describe("Test API", () => {
 		});
 	});
 
-	describe("POST /queues/register", async () => {
+	describe("POST /queues/register", () => {
 		it("should successful register queue and wait 3000ms until the task has been successfully executed", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
@@ -213,6 +213,101 @@ describe("Test API", () => {
 		});
 	});
 
+	describe("PATCH /queues/:id/pause", () => {
+		it("should successful pause queue", async () => {
+			const dueTime = 3000;
+			const { data, status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://www.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
+			// Wait for task
+			await firstValueFrom(timer(dueTime / 2));
+			// ...
+			const pause = await queueApi.queues({ id: data?.id! }).pause.patch(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(pause.status).toBe(200);
+			expect(pause.data?.message).toBeDefined();
+			const q = db.query("SELECT state FROM queue WHERE queueId = ?;");
+			const value = q.get(data?.id!) as { state: string } | null;
+			expect(value?.state).toBe("PAUSED");
+		});
+	});
+
+	describe("PATCH /queues/:id/resume", () => {
+		it("should successful pause queue and then resume queue", async () => {
+			const dueTime = 3000;
+			const { data, status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://www.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
+			// ...
+			await firstValueFrom(timer(1000));
+			// Pause
+			const pause = await queueApi.queues({ id: data?.id! }).pause.patch(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(pause.status).toBe(200);
+			expect(pause.data?.message).toBeDefined();
+			const q1 = db.query("SELECT state FROM queue WHERE queueId = ?;");
+			const value1 = q1.get(data?.id!) as { state: string } | null;
+			expect(value1?.state).toBe("PAUSED");
+			// ...
+			await firstValueFrom(timer(1000));
+			// Resume
+			const resume = await queueApi.queues({ id: data?.id! }).resume.patch(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(resume.status).toBe(200);
+			expect(resume.data?.message).toBeDefined();
+			const q2 = db.query("SELECT state FROM queue WHERE queueId = ?;");
+			const value2 = q2.get(data?.id!) as { state: string } | null;
+			expect(value2?.state).toBe("RUNNING");
+			// Unsubscribe
+			await queueApi.queues({ id: data?.id! }).unsubscribe.patch(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+		});
+	});
+
 	describe("PATCH /queues/:id/unsubscribe", () => {
 		it("should successful unsubscribe queue", async () => {
 			const dueTime = 3000;
@@ -305,7 +400,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(1000));
+			await firstValueFrom(timer(dueTime / 2));
 			// ...
 			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
 				headers: {
@@ -321,6 +416,39 @@ describe("Test API", () => {
 			const q = db.query("SELECT * FROM queue WHERE queueId = ?;");
 			const queue = q.get(data?.id!) as Queue | null;
 			expect(queue).toBe(null);
+		});
+		it("should respond status code 422 if tasks in queue will be deleted without force", async () => {
+			const dueTime = 3000;
+			const { data, status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://www.starlink.com",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: dueTime
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
+			// Waiting for task
+			await firstValueFrom(timer(dueTime / 2));
+			// ...
+			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				},
+				query: {
+
+				}
+			});
+			expect(deleted.status).toBe(422);
 		});
 	});
 });

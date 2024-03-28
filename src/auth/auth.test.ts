@@ -20,7 +20,7 @@ describe("Test AUTH", () => {
 		id = data?.id!;
 	});
 	afterEach(() => {
-		db.run("DELETE FROM subscriber");
+		db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
 	});
 	it("should respond argon2id hash algorithm with memory cost 4 and time cost 3", async () => {
 		const q = db.query("SELECT key FROM subscriber WHERE subscriberId = ?;");

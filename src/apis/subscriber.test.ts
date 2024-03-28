@@ -20,7 +20,7 @@ describe("Test API", () => {
 		id = data?.id!;
 	});
 	afterEach(() => {
-		db.run("DELETE FROM subscriber");
+		db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
 	});
 	
 	describe("GET /subscribers/:name", () => {

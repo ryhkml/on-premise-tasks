@@ -52,8 +52,8 @@ bun bin
 - `PATCH /queues/:id` ❌
 - `DELETE /queues/:id` ✅
 - `GET /queues/:id/config` ❌
-- `PATCH /queues/:id/pause` ❌
-- `PATCH /queues/:id/resume` ❌
+- `PATCH /queues/:id/pause` ✅
+- `PATCH /queues/:id/resume` ✅
 - `PATCH /queues/:id/unsubscribe` ✅
 - `POST /queues/register` ✅
 
