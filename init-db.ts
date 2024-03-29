@@ -42,6 +42,8 @@ async function initDb() {
 		} else {
 			console.log("Table config created");
 		}
+		const createTimeframeTable = await file("./src/sql/tables/timeframe.sql").text();
+		db.run(createTimeframeTable);
 		console.log();
 		console.log("Sqlite file in", path);
 	} catch (e) {

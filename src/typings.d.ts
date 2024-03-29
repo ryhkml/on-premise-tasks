@@ -43,6 +43,7 @@ declare global {
 
 	type Queue = {
 		id: string;
+		subscriberId: string;
 		state: string;
 		statusCode: number;
 		estimateEndAt: number;

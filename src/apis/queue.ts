@@ -1,12 +1,13 @@
+import { env } from "bun";
 import { Database } from "bun:sqlite";
 
 import { randomBytes } from "node:crypto";
 
-import { Context, Elysia, t } from "elysia";
+import { Elysia, t } from "elysia";
 
 import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
-import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
-import { kebabCase, toSafeInteger } from "lodash";
+import { BehaviorSubject, catchError, defer, delay, filter, finalize, interval, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
+import { defer as deferLd, kebabCase, toSafeInteger } from "lodash";
 import { AxiosError } from "axios";
 
 import { fetch } from "../utils/fetch";
@@ -89,8 +90,15 @@ export function queue() {
 						message: "The request did not meet one of it's preconditions"
 					});
 				}
-				// @ts-ignore
-				pushSubscription({ ...ctx, body: resume.body }, resume.dueTime, resume.queueId, resume.configId);
+				const subscriptionCtx = {
+					id: ctx.id,
+					db: ctx.db,
+					body: resume.body,
+					today: ctx.today,
+					store: ctx.store,
+					subject: ctx.subject
+				};
+				pushSubscription(subscriptionCtx, resume.dueTime, resume.queueId, resume.configId);
 				return {
 					message: "Running"
 				};
@@ -383,6 +391,31 @@ export function queue() {
 					ctx.store.queues = ctx.store.queues.filter(queue => !queue.subscription?.closed);
 				}
 			});
+			if (env.NODE_ENV == "test") {
+				return;
+			}
+			deferLd(() => {
+				let resubscribes = resubscribeQueue(ctx.decorator.db);
+				if (resubscribes == null || resubscribes.length == 0) {
+					trackLastRecord(ctx.decorator.db);
+				} else {
+					for (let i = 0; i < resubscribes.length; i++) {
+						const item = resubscribes[i];
+						const subscriptionCtx = {
+							id: item.subscriberId,
+							db: ctx.decorator.db,
+							body: item.body,
+							today: Date.now(),
+							store: ctx.store,
+							subject: ctx.decorator.subject
+						};
+						pushSubscription(subscriptionCtx, item.dueTime, item.queueId, item.configId);
+					}
+					console.log("Resubscribe queues done", resubscribes.length);
+					resubscribes = null;
+					trackLastRecord(ctx.decorator.db);
+				}
+			});
 		});
 }
 
@@ -404,88 +437,16 @@ function unsubscribeQueue(db: Database, id: string, queueId: string) {
 	})();
 }
 
-interface ResumeQueue extends Pick<Queue, "estimateEndAt" | "estimateExecutionAt">, Config {}
+interface ResumeQueue extends Pick<Queue, "subscriberId" | "estimateEndAt" | "estimateExecutionAt">, Config {}
 
 function resumeQueue(db: Database, queueId: string) {
-	const resumeAt = Date.now();
-	const q = db.query("SELECT q.estimateEndAt, q.estimateExecutionAt, c.* FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ? AND q.state = 'PAUSED';");
+	const q = db.query("SELECT q.subscriberId, q.estimateEndAt, q.estimateExecutionAt, c.* FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ? AND q.state = 'PAUSED';");
 	const queue = q.get(queueId) as ResumeQueue | null;
+	q.finalize();
 	if (queue == null) {
 		return null;
 	}
-	const key = kebabCase(db.filename) + ":" + queue.configId;
-	const body = {
-		httpRequest: {
-			url: decr(queue.url, key),
-			method: queue.method,
-			body: !!queue.bodyStringify
-				? JSON.parse(decr(queue.bodyStringify, key))
-				: undefined,
-			query: !!queue.queryStringify
-				? JSON.parse(decr(queue.queryStringify, key))
-				: undefined,
-			headers: !!queue.headersStringify
-				? JSON.parse(decr(queue.headersStringify, key))
-				: undefined
-		},
-		config: {
-			executionDelay: queue.executionDelay,
-			executeAt: queue.executeAt,
-			retry: queue.retry,
-			retryAt: queue.retryAt,
-			retryInterval: queue.retryInterval,
-			retryStatusCode: JSON.parse(queue.retryStatusCode),
-			retryExponential: !!queue.retryExponential,
-			timeout: queue.timeout
-		}
-	} as TaskSubscriberRequest;
-	if (queue.executeAt) {
-		if (queue.retrying) {
-			if (queue.retryAt == 0) {
-				body.config.retry = queue.retryLimit - queue.retryCount;
-			}
-			const delay = Math.abs(
-				differenceInMilliseconds(queue.estimateNextRetryAt, queue.estimateEndAt)
-			);
-			body.config.executeAt = addMilliseconds(resumeAt, delay).getTime();
-		} else {
-			const diffMs = Math.abs(
-				differenceInMilliseconds(queue.estimateExecutionAt, queue.estimateEndAt)
-			);
-			body.config.executeAt = addMilliseconds(resumeAt, diffMs).getTime();
-		}
-	} else {
-		if (queue.retrying) {
-			if (queue.retryAt == 0) {
-				body.config.retry = queue.retryLimit - queue.retryCount;
-			}
-			const delay = Math.abs(
-				differenceInMilliseconds(queue.estimateNextRetryAt, queue.estimateEndAt)
-			);
-			body.config.executionDelay = delay;
-		} else {
-			const diffMs = Math.abs(
-				differenceInMilliseconds(queue.estimateExecutionAt, queue.estimateEndAt)
-			);
-			body.config.executionDelay = diffMs;
-		}
-	}
-	const resumeDueTime = !!body.config.executeAt
-		? new Date(body.config.executeAt)
-		: body.config.executionDelay;
-	const estimateExecutionAt = typeof resumeDueTime === "number"
-		? addMilliseconds(resumeAt, resumeDueTime).getTime()
-		: resumeDueTime.getTime();
-	db.run("UPDATE queue SET state = 'RUNNING', estimateEndAt = 0, estimateExecutionAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
-		estimateExecutionAt,
-		queueId
-	]);
-	return {
-		dueTime: resumeDueTime,
-		queueId,
-		configId: queue.configId,
-		body
-	};
+	return transformQueue(db, queue, queue.estimateEndAt);
 }
 
 function pauseQueue(db: Database, queueId: string) {
@@ -501,7 +462,7 @@ function pauseQueue(db: Database, queueId: string) {
 	return "Done";
 }
 
-interface SubscriptionContext extends Context {
+interface SubscriptionContext {
 	store: {
 		queues: Array<SafeQueue>;
 	};
@@ -594,7 +555,6 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 									// console.error("COUNT", retryCount);
 									// console.error("INTERVAL", millisecondsToSeconds(stateMs) + "sec");
 									// console.error("RETRY UTC", new Date(estimateNextRetryAt).toLocaleString());
-									// 
 									return timer(errorDueTime);
 								})
 							);
@@ -727,12 +687,12 @@ function registerQueue(ctx: SubscriptionContext) {
 	} as Queue;
 }
 
-function deleteQueue(db: Database, id: string, force = false) {
-	const queue = getQueue(db, id);
-	if (queue == null || (queue.state != "DONE" && !force)) {
+function deleteQueue(db: Database, queueId: string, forceDelete = false) {
+	const queue = getQueue(db, queueId);
+	if (queue == null || (queue.state != "DONE" && !forceDelete)) {
 		return null;
 	}
-	db.run("DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);", [id]);
+	db.run("DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber);", [queueId]);
 	return "Done";
 }
 
@@ -750,15 +710,174 @@ function getQueues(db: Database, id: string) {
 	return value;
 }
 
-function getQueue(db: Database, id: string) {
+function getQueue(db: Database, queueId: string) {
 	const q = db.query("SELECT state, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber) LIMIT 1;");
-	const value = q.get(id) as {} | null;
+	const value = q.get(queueId) as {} | null;
 	q.finalize();
 	if (value == null) {
 		return null;
 	}
 	return {
-		id,
+		id: queueId,
 		...value
 	} as Queue;
+}
+
+function transformQueue(db: Database, queue: ResumeQueue, beforeAt: number, terminated = false) {
+	const transformAt = Date.now();
+	const key = kebabCase(db.filename) + ":" + queue.configId;
+	const body = {
+		httpRequest: {
+			url: decr(queue.url, key),
+			method: queue.method,
+			body: !!queue.bodyStringify
+				? JSON.parse(decr(queue.bodyStringify, key))
+				: undefined,
+			query: !!queue.queryStringify
+				? JSON.parse(decr(queue.queryStringify, key))
+				: undefined,
+			headers: !!queue.headersStringify
+				? JSON.parse(decr(queue.headersStringify, key))
+				: undefined
+		},
+		config: {
+			executionDelay: queue.executionDelay,
+			executeAt: queue.executeAt,
+			retry: queue.retry,
+			retryAt: queue.retryAt,
+			retryInterval: queue.retryInterval,
+			retryStatusCode: JSON.parse(queue.retryStatusCode),
+			retryExponential: !!queue.retryExponential,
+			timeout: queue.timeout
+		}
+	} as TaskSubscriberRequest;
+	if (queue.executeAt) {
+		if (queue.retrying) {
+			if (queue.retryAt == 0) {
+				body.config.retry = queue.retryLimit - queue.retryCount;
+			}
+			const delay = Math.abs(
+				differenceInMilliseconds(queue.estimateNextRetryAt, beforeAt)
+			);
+			body.config.executeAt = addMilliseconds(transformAt, delay).getTime();
+		} else {
+			const diffMs = Math.abs(
+				differenceInMilliseconds(queue.estimateExecutionAt, beforeAt)
+			);
+			body.config.executeAt = addMilliseconds(transformAt, diffMs).getTime();
+		}
+	} else {
+		if (queue.retrying) {
+			if (queue.retryAt == 0) {
+				body.config.retry = queue.retryLimit - queue.retryCount;
+			}
+			const delay = Math.abs(
+				differenceInMilliseconds(queue.estimateNextRetryAt, beforeAt)
+			);
+			body.config.executionDelay = delay;
+		} else {
+			const diffMs = Math.abs(
+				differenceInMilliseconds(queue.estimateExecutionAt, beforeAt)
+			);
+			body.config.executionDelay = diffMs;
+		}
+	}
+	const resumeDueTime = !!body.config.executeAt
+		? new Date(body.config.executeAt)
+		: body.config.executionDelay;
+	const estimateExecutionAt = typeof resumeDueTime === "number"
+		? addMilliseconds(transformAt, resumeDueTime).getTime()
+		: resumeDueTime.getTime();
+	if (!terminated) {
+		db.run("UPDATE queue SET state = 'RUNNING', estimateEndAt = 0, estimateExecutionAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
+			estimateExecutionAt,
+			queue.queueId
+		]);
+	}
+	return {
+		subscriberId: queue.subscriberId,
+		queueId: queue.queueId,
+		configId: queue.configId,
+		dueTime: resumeDueTime,
+		body
+	};
+}
+
+interface ResubscribeQueue {
+	subscriberId: string;
+	dueTime: number | Date;
+	queueId: string;
+	configId: string;
+	body: TaskSubscriberRequest;
+}
+
+/**
+ * ATTENTION!
+ *
+ * Resubscribe queue is a mechanism for resuming tasks when the server suddenly shuts down.
+ * Automatically, all tasks that have `STATE = RUNNING`, will be paused and will then be resumed when the server is online.
+ * As more tasks are paused, there will likely be a sizable increase in processor and memory resources.
+*/
+function resubscribeQueue(db: Database) {
+	const resubscribeAt = Date.now();
+	const q1 = db.query("SELECT q.subscriberId, q.estimateEndAt, q.estimateExecutionAt, c.* FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.state = 'RUNNING';");
+	const queueValues = q1.all() as Array<ResumeQueue> | null;
+	q1.finalize();
+	if (queueValues == null || queueValues.length == 0) {
+		return null;
+	}
+	const q2 = db.query("SELECT lastRecordAt FROM timeframe LIMIT 1;");
+	let timeframe = q2.get() as { lastRecordAt: number } | null;
+	q2.finalize();
+	if (timeframe == null) {
+		timeframe = {
+			lastRecordAt: resubscribeAt
+		};
+	}
+	const stmt = db.prepare("UPDATE queue SET estimateExecutionAt = @estimateExecutionAt WHERE queueId = @queueId AND subscriberId IN (SELECT subscriberId FROM subscriber);");
+	const updateResubscribeQueue = db.transaction((queues: Array<{ [k: string]: string | number }>) => {
+		for (let i = 0; i < queues.length; i++) {
+			const queue = queues[i];
+			stmt.run(queue);
+		}
+	});
+	const resubscribes = [] as Array<ResubscribeQueue>;
+	for (let i = 0; i < queueValues.length; i++) {
+		const queue = queueValues[i];
+		resubscribes.push(
+			transformQueue(db, queue, timeframe.lastRecordAt, true)
+		);
+	}
+	updateResubscribeQueue(
+		resubscribes.map(item => ({
+			"@estimateExecutionAt": typeof item.dueTime === "number"
+				? addMilliseconds(resubscribeAt, item.dueTime).getTime()
+				: item.dueTime.getTime(),
+			"@queueId": item.queueId
+		}))
+	);
+	return resubscribes;
+}
+
+function trackLastRecord(db: Database) {
+	interval(1000).pipe(
+		map((_, index) => ({
+			index,
+			recordAt: Date.now()
+		}))
+	)
+	.subscribe({
+		next({ index, recordAt }) {
+			if (index == 0) {
+				const q = db.query("SELECT lastRecordAt FROM timeframe LIMIT 1;");
+				const value = q.get() as { lastRecordAt: number } | null;
+				q.finalize();
+				if (value == null) {
+					db.run("INSERT INTO timeframe (lastRecordAt) VALUES (?);", [recordAt]);
+				}
+			} else {
+				db.run("UPDATE timeframe SET lastRecordAt = ?;", [recordAt]);
+			}
+		}
+	});
 }

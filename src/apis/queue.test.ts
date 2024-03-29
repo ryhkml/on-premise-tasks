@@ -30,7 +30,7 @@ describe("Test API", () => {
 			db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
 		})();
 	});
-	
+
 	describe("GET /queues/:id", () => {
 		it("should successful get queue", async () => {
 			const dueTime = 3000;

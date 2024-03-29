@@ -7,7 +7,8 @@
 	],
 	"scripts": {
 		"bin": "bun build --compile --minify --sourcemap src/main.ts --outfile ./tasks",
-		"dev": "bun run --watch src/main.ts",
+		"dev": "bun run --hot src/main.ts",
+		"test": "NODE_ENV=test bun test --timeout 10000",
 		"reinit:db": "rm -rf db/tasks.* && bun run init-db.ts",
 		"reinit:testdb": "rm -rf db/test/tasks.* && bun run init-db.ts test"
 	},
