@@ -2,7 +2,7 @@ CREATE TABLE queue (
 	id 						INTEGER PRIMARY KEY AUTOINCREMENT,
 	queueId 				TEXT UNIQUE NOT NULL,
 	subscriberId 			TEXT NOT NULL,
-	state 					TEXT NULL DEFAULT "RUNNING",
+	state 					TEXT NULL DEFAULT 'RUNNING',
 	statusCode 				INTEGER NULL DEFAULT 0,
 	estimateEndAt 			INTEGER NULL DEFAULT 0,
 	estimateExecutionAt 	INTEGER NOT NULL,

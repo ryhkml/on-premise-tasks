@@ -847,22 +847,21 @@ function resubscribeQueue(db: Database) {
 
 function trackLastRecord(db: Database) {
 	interval(1000).pipe(
-		map((_, index) => ({
-			index,
-			recordAt: Date.now()
-		}))
+		map((_, index) => index)
 	)
 	.subscribe({
-		next({ index, recordAt }) {
+		next(index) {
 			if (index == 0) {
 				const q = db.query("SELECT lastRecordAt FROM timeframe LIMIT 1;");
 				const value = q.get() as { lastRecordAt: number } | null;
 				q.finalize();
 				if (value == null) {
-					db.run("INSERT INTO timeframe (lastRecordAt) VALUES (?);", [recordAt]);
+					db.run("INSERT INTO timeframe (lastRecordAt) VALUES (NULL);");
+				} else {
+					db.run("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
 				}
 			} else {
-				db.run("UPDATE timeframe SET lastRecordAt = ?;", [recordAt]);
+				db.run("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
 			}
 		}
 	});
