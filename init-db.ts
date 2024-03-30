@@ -5,6 +5,7 @@ import { firstValueFrom, timer } from "rxjs";
 
 async function initDb() {
 	try {
+		const initAt = Date.now();
 		let path = env.PATH_SQLITE;
 		let isDev = env.LEVEL == "DEV";
 		if (argv[2]?.trim().toLowerCase() == "test") {
@@ -19,33 +20,20 @@ async function initDb() {
 		await firstValueFrom(timer(1000));
 		db.exec("PRAGMA journal_mode = WAL;");
 		db.exec("PRAGMA foreign_keys = ON;");
-		const createSubscriberTable = await file("./src/sql/tables/subscriber.sql").text();
-		db.run(createSubscriberTable);
-		if (isDev) {
-			console.log("Table test subscriber created");
-		} else {
-			console.log("Table subscriber created");
-		}
-		console.log();
-		const createQueueTable = await file("./src/sql/tables/queue.sql").text();
-		db.run(createQueueTable);
-		if (isDev) {
-			console.log("Table test queue created");
-		} else {
-			console.log("Table queue created");
-		}
-		console.log();
-		const createConfigTable = await file("./src/sql/tables/config.sql").text();
-		db.run(createConfigTable);
-		if (isDev) {
-			console.log("Table test config created");
-		} else {
-			console.log("Table config created");
-		}
-		const createTimeframeTable = await file("./src/sql/tables/timeframe.sql").text();
-		db.run(createTimeframeTable);
-		console.log();
-		console.log("Sqlite file in", path);
+		const [t1, t2, t3, t4] = await Promise.all([
+			file("./src/sql/tables/subscriber.sql").text(),
+			file("./src/sql/tables/queue.sql").text(),
+			file("./src/sql/tables/config.sql").text(),
+			file("./src/sql/tables/timeframe.sql").text()
+		]);
+		db.transaction(() => {
+			db.run(t1);
+			db.run(t2);
+			db.run(t3);
+			db.run(t4);
+			db.run("INSERT INTO timeframe (lastRecordAt) VALUES (?);", [initAt]);
+		})();
+		console.log("The table was created successfully", ">>", path);
 	} catch (e) {
 		console.error(e);
 	}

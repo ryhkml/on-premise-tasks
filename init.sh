@@ -6,6 +6,7 @@ bun -v
 
 cat <<EOF >.env
 TZ="UTC"
+LOG="1" # 1 = TRUE, 0 = FALSE
 PORT=
 LEVEL="DEV" # Comment this for production usage
 PATH_SQLITE="./db/tasks.sqlite"

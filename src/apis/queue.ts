@@ -383,10 +383,6 @@ export function queue() {
 			)
 			.subscribe({
 				next() {
-					// for (let i = 0; i < ctx.store.queues.length; i++) {
-					// 	const { id, subscription } = ctx.store.queues[i];
-					// 	console.log(id, subscription);
-					// }
 					ctx.store.queues = ctx.store.queues.filter(queue => !queue.subscription?.closed);
 				}
 			});
@@ -473,6 +469,7 @@ interface SubscriptionContext {
 }
 
 function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queueId: string, configId: string) {
+	const log = toSafeInteger(env.LOG) == 1;
 	ctx.store.queues.push({
 		id: queueId,
 		subscription: timer(dueTime).pipe(
@@ -507,51 +504,44 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 						count: ctx.body.config.retry,
 						delay() {
 							const retryingAt = Date.now();
-							ctx.db.run("UPDATE config SET retrying = 1, retryCount = retryCount + 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
-							const qSource$ = defer(() => {
-								const q = ctx.db.query("SELECT retryCount, retryLimit FROM config WHERE configId = ? LIMIT 1;");
-								const { retryCount, retryLimit } = q.get(configId) as Pick<Config, "retryCount" | "retryLimit">;
-								q.finalize();
-								return of({ retryCount, retryLimit });
-							});
-							return qSource$.pipe(
-								switchMap(({ retryCount, retryLimit }) => {
-									let errorDueTime = 0 as number | Date;
-									let estimateNextRetryAt = 0;
-									if (ctx.body.config.retryAt) {
-										errorDueTime = new Date(ctx.body.config.retryAt);
-										estimateNextRetryAt = ctx.body.config.retryAt;
-									} else {
-										errorDueTime = ctx.body.config.retryExponential
-											? ctx.body.config.retryInterval * retryCount
-											: ctx.body.config.retryInterval;
-										estimateNextRetryAt = addMilliseconds(retryingAt, errorDueTime).getTime();
-									}
-									additionalHeaders = {
-										...additionalHeaders,
-										"X-Tasks-Queue-Id": queueId,
-										"X-Tasks-Retry-Count": retryCount.toString(),
-										"X-Tasks-Retry-Limit": retryLimit.toString(),
-										"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
-									};
-									ctx.db.run("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE configId = ?3 AND queueId IN (SELECT queueId FROM queue);", [
-										encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + configId),
-										estimateNextRetryAt,
-										configId
-									]);
-									// Debug
-									if (typeof errorDueTime === "number") {
-										stateMs += errorDueTime;
-									} else {
-										stateMs = new Date(errorDueTime).getTime();
-									}
-									// console.error();
-									// console.error("COUNT", retryCount);
-									// console.error("INTERVAL", millisecondsToSeconds(stateMs) + "sec");
-									// console.error("RETRY UTC", new Date(estimateNextRetryAt).toLocaleString());
-									return timer(errorDueTime);
-								})
-							);
+							const q = ctx.db.query("UPDATE config SET retrying = 1, retryCount = retryCount + 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue) RETURNING retryCount, retryLimit;");
+							const { retryCount, retryLimit } = q.get(configId) as Pick<Config, "retryCount" | "retryLimit">;
+							q.finalize();
+							let errorDueTime = 0 as number | Date;
+							let estimateNextRetryAt = 0;
+							if (ctx.body.config.retryAt) {
+								errorDueTime = new Date(ctx.body.config.retryAt);
+								estimateNextRetryAt = ctx.body.config.retryAt;
+							} else {
+								errorDueTime = ctx.body.config.retryExponential
+									? ctx.body.config.retryInterval * retryCount
+									: ctx.body.config.retryInterval;
+								estimateNextRetryAt = addMilliseconds(retryingAt, errorDueTime).getTime();
+							}
+							additionalHeaders = {
+								...additionalHeaders,
+								"X-Tasks-Queue-Id": queueId,
+								"X-Tasks-Retry-Count": retryCount.toString(),
+								"X-Tasks-Retry-Limit": retryLimit.toString(),
+								"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
+							};
+							ctx.db.run("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE configId = ?3 AND queueId IN (SELECT queueId FROM queue);", [
+								encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + configId),
+								estimateNextRetryAt,
+								configId
+							]);
+							if (log) {
+								if (typeof errorDueTime === "number") {
+									stateMs += errorDueTime;
+								} else {
+									stateMs = new Date(errorDueTime).getTime();
+								}
+								console.error();
+								console.error("COUNT", retryCount);
+								console.error("INTERVAL", millisecondsToSeconds(stateMs) + "sec");
+								console.error("RETRY DATE UTC", new Date(estimateNextRetryAt).toLocaleString());
+							}
+							return timer(errorDueTime);
 						}
 					})
 				);
@@ -571,23 +561,27 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 					]);
 					ctx.db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 				})();
-				// console.log();
-				// console.log("DONE", res);
+				if (log) {
+					console.log();
+					console.log("DONE", res);
+				}
 			},
-			error(error) {
+			error(err) {
 				const errorAt = Date.now();
 				ctx.db.transaction(() => {
 					ctx.db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = ?;", [ctx.id]);
 					ctx.db.run("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 						"ERROR",
-						error.status,
+						err.status,
 						errorAt,
 						queueId
 					]);
 					ctx.db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 				})();
-				// console.error();
-				// console.error("ERROR", error);
+				if (log) {
+					console.error();
+					console.error("ERROR", err);
+				}
 			}
 		})
 	});
@@ -806,19 +800,11 @@ function transformQueue(db: Database, queue: ResumeQueue, beforeAt: number, term
 */
 function resubscribeQueue(db: Database) {
 	const resubscribeAt = Date.now();
-	const q1 = db.query("SELECT q.subscriberId, q.estimateEndAt, q.estimateExecutionAt, c.* FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.state = 'RUNNING';");
-	const queueValues = q1.all() as Array<ResumeQueue> | null;
+	const q1 = db.query("SELECT q.subscriberId, q.estimateEndAt, q.estimateExecutionAt, c.*, (SELECT lastRecordAt FROM timeframe) AS lastRecordAt FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.state = 'RUNNING';");
+	const queueValues = q1.all(1) as Array<ResumeQueue & { lastRecordAt: number }> | null;
 	q1.finalize();
 	if (queueValues == null || queueValues.length == 0) {
 		return null;
-	}
-	const q2 = db.query("SELECT lastRecordAt FROM timeframe LIMIT 1;");
-	let timeframe = q2.get() as { lastRecordAt: number } | null;
-	q2.finalize();
-	if (timeframe == null) {
-		timeframe = {
-			lastRecordAt: resubscribeAt
-		};
 	}
 	const stmt = db.prepare("UPDATE queue SET estimateExecutionAt = @estimateExecutionAt WHERE queueId = @queueId AND subscriberId IN (SELECT subscriberId FROM subscriber);");
 	const updateResubscribeQueue = db.transaction((queues: Array<{ [k: string]: string | number }>) => {
@@ -831,7 +817,7 @@ function resubscribeQueue(db: Database) {
 	for (let i = 0; i < queueValues.length; i++) {
 		const queue = queueValues[i];
 		resubscribes.push(
-			transformQueue(db, queue, timeframe.lastRecordAt, true)
+			transformQueue(db, queue, queue.lastRecordAt, true)
 		);
 	}
 	updateResubscribeQueue(
@@ -846,23 +832,9 @@ function resubscribeQueue(db: Database) {
 }
 
 function trackLastRecord(db: Database) {
-	interval(1000).pipe(
-		map((_, index) => index)
-	)
-	.subscribe({
-		next(index) {
-			if (index == 0) {
-				const q = db.query("SELECT lastRecordAt FROM timeframe LIMIT 1;");
-				const value = q.get() as { lastRecordAt: number } | null;
-				q.finalize();
-				if (value == null) {
-					db.run("INSERT INTO timeframe (lastRecordAt) VALUES (NULL);");
-				} else {
-					db.run("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
-				}
-			} else {
-				db.run("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
-			}
+	interval(1000).subscribe({
+		next() {
+			db.run("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
 		}
 	});
 }
