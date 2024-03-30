@@ -1,12 +1,14 @@
-import { Agent as HttpAgent } from "node:http";
-import { Agent as HttpsAgent } from "node:https";
+import { Observable, timeout } from "rxjs";
 
-import { defer } from "rxjs";
+interface FetchRes {
+	data: string | null;
+	state: "DONE" | "ERROR";
+	status: number;
+	statusText: string;
+}
 
-import axios from "axios";
-
-export function fetch(req: TaskSubscriberRequest, additionalHeaders?: { [k: string]: string }) {
-	return defer(() => {
+export function fetchHttp(req: TaskSubscriberRequest, additionalHeaders?: { [k: string]: string }) {
+	const source$ = new Observable<FetchRes>(observer => {
 		let headers = {};
 		if (req.httpRequest.headers) {
 			headers = req.httpRequest.headers;
@@ -23,27 +25,47 @@ export function fetch(req: TaskSubscriberRequest, additionalHeaders?: { [k: stri
 				};
 			}
 		}
-		const query = req.httpRequest.query
+		const query = !!req.httpRequest.query
 			? "?" + new URLSearchParams(req.httpRequest.query).toString()
 			: "";
-		return axios({
-			maxRedirects: 8,
-			adapter: "http",
-			timeout: req.config.timeout,
+		fetch(req.httpRequest.url + query, {
 			method: req.httpRequest.method,
-			data: req.httpRequest.body,
-			url: req.httpRequest.url + query,
+			cache: "no-cache",
+			body: !!req.httpRequest.body
+				? JSON.stringify(req.httpRequest.body)
+				: undefined,
 			headers: {
 				...headers,
 				"Cache-Control": "no-cache, no-store, must-revalidate",
 				"User-Agent": "Op-Tasks/1.0.0"
-			},
-			httpAgent: new HttpAgent({
-				keepAlive: true
-			}),
-			httpsAgent: new HttpsAgent({
-				keepAlive: true
-			})
-		});
+			}
+		})
+		.then(async res => {
+			try {
+				const text = await res.text();
+				if (res.ok) {
+					observer.next({
+						data: Buffer.from(text).toString("base64"),
+						state: "DONE",
+						status: res.status,
+						statusText: res.statusText || "Unknown"
+					});
+					observer.complete();
+				} else {
+					observer.error({
+						data: Buffer.from(text).toString("base64"),
+						state: "ERROR",
+						status: res.status,
+						statusText: res.statusText || "Unknown"
+					});
+				}
+			} catch (err) {
+				observer.error(err);
+			}
+		})
+		.catch(err => observer.error(err));
 	});
+	return source$.pipe(
+		timeout({ each: req.config.timeout })
+	);
 }

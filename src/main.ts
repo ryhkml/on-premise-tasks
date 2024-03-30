@@ -1,13 +1,16 @@
 import { env } from "bun";
 
+import { exit } from "node:process";
+
 import { Elysia } from "elysia";
+
 import { toString } from "lodash";
 
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
+import { connectivity } from "./utils/connectivity";
 
-const port = +env.PORT! || 3200;
-const app = new Elysia()
+new Elysia()
 	.headers({
 		"Permissions-Policy": "camera=(), microphone=(), interest-cohort=()",
 		"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
@@ -33,14 +36,23 @@ const app = new Elysia()
 	.use(subscriber())
 	.use(queue())
 	.onStart(ctx => {
-		try {
-			ctx.decorator.db.exec("PRAGMA journal_mode = WAL;");
-			ctx.decorator.db.exec("PRAGMA foreign_keys = ON;");
-			console.log("Database ok");
-		} catch (e) {
-			console.error("ERROR DATABASE:", toString(e));
-		}
+		connectivity().subscribe({
+			next() {
+				try {
+					console.log("Connectivity ok");
+					ctx.decorator.db.exec("PRAGMA journal_mode = WAL;");
+					ctx.decorator.db.exec("PRAGMA foreign_keys = ON;");
+					console.log("Database ok");
+					console.log("Server listening on port", ctx.server?.port);
+				} catch (e) {
+					console.error("ERROR DATABASE:", toString(e));
+					exit(1);
+				}
+			},
+			error(err) {
+				console.error(err);
+				exit(1);
+			}
+		})
 	})
-	.listen(port);
-
-console.log("Server listening on port", app.server?.port);
+	.listen(+env.PORT! || 3200);

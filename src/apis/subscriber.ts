@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 
 import { Elysia, t } from "elysia";
 import { deburr } from "lodash";
-import { ulid } from "ulid";
+import { monotonicFactory } from "ulid";
 
 import { tasksDb } from "../db";
 import { pluginAuth } from "../auth/auth";
@@ -127,7 +127,8 @@ export function subscriber() {
 			today: Date.now()
 		}))
 		.post("/register", async ctx => {
-			const id = ulid();
+			const ulid = monotonicFactory();
+			const id = ulid(ctx.today);
 			const key = "t-" + Buffer.from(id + ":" + ctx.today).toString("base64");
 			const secretKey = await password.hash(key, {
 				algorithm: "argon2id",

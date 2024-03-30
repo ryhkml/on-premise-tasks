@@ -6,11 +6,10 @@ import { randomBytes } from "node:crypto";
 import { Elysia, t } from "elysia";
 
 import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
-import { BehaviorSubject, catchError, defer, delay, filter, finalize, interval, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
+import { BehaviorSubject, TimeoutError, catchError, defer, delay, filter, finalize, interval, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
 import { defer as deferLd, kebabCase, toSafeInteger } from "lodash";
-import { AxiosError } from "axios";
 
-import { fetch } from "../utils/fetch";
+import { fetchHttp } from "../utils/fetch";
 import { pluginAuth } from "../auth/auth";
 import { decr, encr } from "../utils/crypto";
 
@@ -480,33 +479,28 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 			switchMap(() => {
 				let additionalHeaders = {} as { [k: string]: string };
 				let stateMs = 0;
-				return defer(() => fetch(ctx.body, additionalHeaders)).pipe(
-					map(res => ({
-						data: res.data,
-						state: "DONE",
-						status: res.status,
-						statusText: res.statusText
-					})),
+				return defer(() => fetchHttp(ctx.body, additionalHeaders)).pipe(
 					catchError(error => {
-						if (error instanceof AxiosError) {
-							const errorStatusCode = toSafeInteger(error.response?.status) || 500;
-							const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == errorStatusCode);
-							const errorResponse = {
+						if (error instanceof TimeoutError) {
+							return throwError(() => ({
 								data: null,
 								state: "ERROR",
-								status: errorStatusCode,
-								statusText: error.response?.statusText || "Unknown"
-							};
+								status: 408,
+								statusText: "Request Timeout"
+							}));
+						}
+						if ("status" in error) {
+							const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == error.status);
 							if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatusCode) {
-								return throwError(() => errorResponse);
+								return throwError(() => error);
 							}
-							return of(errorResponse);
+							return of(error);
 						}
 						return throwError(() => ({
 							data: null,
+							state: "UNKNOWN",
 							status: 500,
-							state: "ERROR",
-							statusText: "Internal Server Error"
+							statusText: String(error)
 						}));
 					}),
 					retry({
@@ -578,7 +572,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 					ctx.db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 				})();
 				// console.log();
-				// console.log("DONE", queueId);
+				// console.log("DONE", res);
 			},
 			error(error) {
 				const errorAt = Date.now();
@@ -593,15 +587,15 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 					ctx.db.run("UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue);", [configId]);
 				})();
 				// console.error();
-				// console.error("ERROR", queueId);
+				// console.error("ERROR", error);
 			}
 		})
 	});
 }
 
 function registerQueue(ctx: SubscriptionContext) {
-	const queueId = randomBytes(6).toString("hex").toUpperCase() + ctx.today.toString();
-	const configId = randomBytes(6).toString("hex").toUpperCase() + ctx.today.toString();
+	const queueId = genId(ctx.today);
+	const configId = genId(ctx.today);
 	const key = kebabCase(ctx.db.filename) + ":" + configId;
 	const dueTime = !!ctx.body.config.executeAt
 		? new Date(ctx.body.config.executeAt)
@@ -796,19 +790,11 @@ function transformQueue(db: Database, queue: ResumeQueue, beforeAt: number, term
 	}
 	return {
 		subscriberId: queue.subscriberId,
-		queueId: queue.queueId,
 		configId: queue.configId,
+		queueId: queue.queueId,
 		dueTime: resumeDueTime,
 		body
 	};
-}
-
-interface ResubscribeQueue {
-	subscriberId: string;
-	dueTime: number | Date;
-	queueId: string;
-	configId: string;
-	body: TaskSubscriberRequest;
 }
 
 /**
@@ -841,7 +827,7 @@ function resubscribeQueue(db: Database) {
 			stmt.run(queue);
 		}
 	});
-	const resubscribes = [] as Array<ResubscribeQueue>;
+	const resubscribes = [] as Array<ReturnType<typeof transformQueue>>;
 	for (let i = 0; i < queueValues.length; i++) {
 		const queue = queueValues[i];
 		resubscribes.push(
@@ -880,4 +866,8 @@ function trackLastRecord(db: Database) {
 			}
 		}
 	});
+}
+
+function genId(dateAt: number, start = 8, size = 10) {
+	return dateAt.toString().substring(start) + randomBytes(size).toString("hex").toUpperCase();
 }
