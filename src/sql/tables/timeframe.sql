@@ -3,8 +3,8 @@ CREATE TABLE timeframe (
     lastRecordAt	INTEGER NULL DEFAULT (STRFTIME('%s', 'now') * 1000)
 );
 
-CREATE TRIGGER updateLastRecord
-AFTER UPDATE ON timeframe
+CREATE TRIGGER trackLastRecord
+AFTER UPDATE OF lastRecordAt ON timeframe
 BEGIN
-	UPDATE timeframe SET lastRecordAt = (STRFTIME('%s', 'now') * 1000) WHERE rowId = NEW.rowId;
+	UPDATE timeframe SET lastRecordAt = (STRFTIME('%s', 'now') * 1000) WHERE id = 1;
 END;

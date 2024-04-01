@@ -1,9 +1,9 @@
 CREATE TABLE config (
 	id 						INTEGER PRIMARY KEY AUTOINCREMENT,
 	configId 				TEXT UNIQUE NOT NULL,
-	queueId 				TEXT NOT NULL,
-	url 					TEXT NOT NULL,
-	method 					TEXT NOT NULL,
+	queueId 				TEXT NULL,
+	url 					TEXT NULL,
+	method 					TEXT NULL,
 	bodyStringify 			TEXT NULL,
 	queryStringify 			TEXT NULL,
 	headersStringify 		TEXT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE config (
 	retryCount 				INTEGER NULL DEFAULT 0,
 	retryLimit 				INTEGER NULL DEFAULT 0,
 	retryInterval 			INTEGER NULL DEFAULT 0,
-	retryStatusCode 		TEXT NULL DEFAULT "[]",
+	retryStatusCode 		TEXT NULL DEFAULT '[]',
 	retryExponential 		INTEGER NULL DEFAULT 1,
 	estimateNextRetryAt 	INTEGER NULL DEFAULT 0,
 	timeout 				INTEGER NULL DEFAULT 30000,
@@ -23,3 +23,10 @@ CREATE TABLE config (
 );
 
 CREATE INDEX ixConfigId ON config(configId);
+
+CREATE TRIGGER incrementRetryCount
+BEFORE UPDATE OF retrying ON config
+WHEN NEW.retrying = 1
+BEGIN
+    UPDATE config SET retryCount = retryCount + 1 WHERE configId = NEW.configId;
+END;

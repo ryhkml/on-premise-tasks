@@ -185,11 +185,11 @@ export function subscriber() {
 }
 
 function isSubscriberRegistered(db: Database, name: string) {
-	const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?);");
-	const obj = q.get(name) as { [k: string]: number };
+	const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?) AS isRegistered;");
+	const value = q.get(name) as { isRegistered: number };
 	q.finalize();
-	const value = Object.values(obj)[0];
-	return !!value;
+	const isRegistered = !!value.isRegistered;
+	return isRegistered;
 };
 
 function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksInQueue" | "tasksInQueueLimit">) {
