@@ -4,13 +4,11 @@ import { exit } from "node:process";
 
 import { Elysia } from "elysia";
 
-import { toString } from "lodash";
-
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
 import { connectivity } from "./utils/connectivity";
 
-new Elysia()
+const app = new Elysia()
 	.headers({
 		"Permissions-Policy": "camera=(), microphone=(), interest-cohort=()",
 		"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
@@ -34,25 +32,28 @@ new Elysia()
 		return ctx.error;
 	})
 	.use(subscriber())
-	.use(queue())
-	.onStart(ctx => {
-		connectivity().subscribe({
-			next() {
-				try {
-					console.log("Connectivity ok");
-					ctx.decorator.db.exec("PRAGMA journal_mode = WAL;");
-					ctx.decorator.db.exec("PRAGMA foreign_keys = ON;");
-					console.log("Database ok");
-					console.log("Server listening on port", ctx.server?.port);
-				} catch (e) {
-					console.error("ERROR DATABASE:", toString(e));
-					exit(1);
-				}
-			},
-			error(err) {
-				console.error(err);
-				exit(1);
-			}
-		})
-	})
-	.listen(+env.PORT! || 3200);
+	.use(queue());
+
+connectivity().subscribe({
+	next() {
+		console.log("Connectivity ok!");
+		if (env.TZ == "UTC") {
+			console.log("Timezone ok!");
+		} else {
+			console.error("Set env variable \"TZ\" to UTC");
+			exit(1);
+		}
+		app.listen(+env.PORT! || 3200);
+		if (app.decorator.db.filename) {
+			console.log("Database ok!");
+		} else {
+			console.error("Database is empty");
+			exit(1);
+		}
+		console.log("Server listening on port", app.server?.port);
+	},
+	error(err) {
+		console.error(err);
+		exit(1);
+	}
+});

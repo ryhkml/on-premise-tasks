@@ -1,7 +1,10 @@
 import { Subscription } from "rxjs";
 
 declare global {
-	type SubscriberContext = {
+
+	type SafeAny = any;
+
+	type SubscriberTable = {
 		id: string;
 		subscriberId: string;
 		subscriberName: string;
@@ -11,9 +14,11 @@ declare global {
 		tasksInQueueLimit: number;
 	}
 
+	type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
 	type TaskHttp = {
 		url: string;
-		method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+		method: Method;
 		body?: {
 			[key: string]: string;
 		};
@@ -36,12 +41,12 @@ declare global {
 		timeout: number;
 	}
 
-	type TaskSubscriberRequest = {
+	type TaskSubscriberReq = {
 		httpRequest: TaskHttp;
 		config: TaskConfig;
 	}
 
-	type Queue = {
+	type QueueTable = {
 		id: string;
 		subscriberId: string;
 		state: string;
@@ -50,16 +55,17 @@ declare global {
 		estimateExecutionAt: number;
 	}
 
-	type SafeQueue = {
+	type QueueSafe = {
 		id: string;
 		subscription: Subscription;
 	}
 
-	type Config = {
+	type ConfigTable = {
+		id: string;
 		configId: string;
 		queueId: string;
 		url: string;
-		method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+		method: Method;
 		bodyStringify: string | null;
 		queryStringify: string | null;
 		headersStringify: string | null;

@@ -19,7 +19,9 @@ async function initDb() {
 		await write(path, "");
 		await firstValueFrom(timer(1000));
 		db.exec("PRAGMA journal_mode = WAL;");
+		db.exec("PRAGMA synchronous = NORMAL;");
 		db.exec("PRAGMA foreign_keys = ON;");
+		db.exec("PRAGMA journal_size_limit = 1048576;");
 		const [t1, t2, t3, t4] = await Promise.all([
 			file("./src/sql/tables/subscriber.sql").text(),
 			file("./src/sql/tables/queue.sql").text(),

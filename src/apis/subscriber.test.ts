@@ -14,13 +14,15 @@ let key = "";
 let id = "";
 
 describe("Test API", () => {
+	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
+
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
 	});
 	afterEach(() => {
-		db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
+		stmtS.run(name);
 	});
 
 	describe("GET /subscribers/:name", () => {
@@ -51,14 +53,14 @@ describe("Test API", () => {
 
 	describe("POST /subscribers/register", () => {
 		it("should the subscriber not registered", () => {
-			db.run("DELETE FROM subscriber");
-			const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?);");
-			const obj = q.get(name) as { [k: string]: number };
-			const isExists = !!Object.values(obj)[0];
-			expect(isExists).toBe(false);
+			stmtS.run(name);
+			const q = db.query<{ isRegistered: 0 | 1 }, string>("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?) AS isRegistered;");
+			const subscriber = q.get(name)!;
+			const notExists = !!subscriber.isRegistered;
+			expect(notExists).toBe(false);
 		});
 		it("should successful register subscriber", async () => {
-			db.run("DELETE FROM subscriber");
+			stmtS.run(name);
 			const { data, status } = await subscriberApi.subscribers.register.post({ name });
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();

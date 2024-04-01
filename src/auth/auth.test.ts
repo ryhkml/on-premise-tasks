@@ -14,17 +14,20 @@ let key = "";
 let id = "";
 
 describe("Test AUTH", () => {
+	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
+
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
 	});
 	afterEach(() => {
-		db.run("DELETE FROM subscriber WHERE subscriberName = ?;", [name]);
+		stmtS.run(name);
 	});
+
 	it("should respond argon2id hash algorithm with memory cost 4 and time cost 3", async () => {
-		const q = db.query("SELECT key FROM subscriber WHERE subscriberId = ?;");
-		const secret = q.get(id) as { key: string } | null;
+		const q = db.query<Pick<SubscriberTable, "key">, string>("SELECT key FROM subscriber WHERE subscriberId = ? LIMIT 1;");
+		const secret = q.get(id);
 		expect(secret?.key).toBeDefined();
 		expect(secret?.key).toMatch(/\$argon2id\$v=19\$m=4,t=3,p=1\$/);
 		const isValid = await password.verify(key, secret?.key!, "argon2id");

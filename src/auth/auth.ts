@@ -4,11 +4,11 @@ import { Elysia } from "elysia";
 
 import { toString } from "lodash";
 
-import { tasksDb } from "../db";
+import { stmtSubscriberKey } from "../db";
 
 export function pluginAuth() {
 	return new Elysia({ name: "pluginAuth" })
-		.decorate("db", tasksDb())
+		.decorate("stmtSubscriberKey", stmtSubscriberKey())
 		.derive({ as: "global" }, ctx => {
 			const auth = ctx.headers["authorization"];
 			return {
@@ -25,9 +25,7 @@ export function pluginAuth() {
 					message: "The request did not include valid authentication"
 				});
 			}
-			const q = ctx.db.query("SELECT key FROM subscriber WHERE subscriberId = ? LIMIT 1;");
-			const value = q.get(ctx.id) as Pick<SubscriberContext, "key"> | null;
-			q.finalize();
+			const value = ctx.stmtSubscriberKey.get(ctx.id);
 			if (value == null) {
 				return ctx.error("Unauthorized", {
 					message: "The request did not include valid authentication"

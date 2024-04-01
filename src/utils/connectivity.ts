@@ -1,14 +1,14 @@
 import { env } from "bun";
 
-import { lookup } from "node:dns";
+import { resolve } from "node:dns";
 
-import { Observable, timeout } from "rxjs";
+import { Observable, TimeoutError, catchError, throwError, timeout } from "rxjs";
 import { toString } from "lodash";
 
 export function connectivity() {
 	const source$ = new Observable<string>(observer => {
-		const hostname = env.CONNECTIVITY_HOSTNAME || "8.8.8.8";
-		lookup(hostname, (err, _) => {
+		const hostname = env.CONNECTIVITY_HOSTNAME || "google.com";
+		resolve(hostname, err => {
 			if (err) {
 				observer.error(toString(err));
 			} else {
@@ -18,6 +18,12 @@ export function connectivity() {
 		});
 	});
 	return source$.pipe(
-		timeout({ each: 30000 })
+		timeout({ each: 30000 }),
+		catchError(err => {
+			if (err instanceof TimeoutError) {
+				return throwError(() => "Make sure the server is connected to the internet");
+			}
+			return throwError(() => err);
+		})
 	);
 }

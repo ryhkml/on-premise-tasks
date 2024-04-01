@@ -5,7 +5,7 @@ import { Elysia, t } from "elysia";
 import { deburr } from "lodash";
 import { monotonicFactory } from "ulid";
 
-import { tasksDb } from "../db";
+import { stmtSubscriberRegistered, tasksDb } from "../db";
 import { pluginAuth } from "../auth/auth";
 
 export function subscriber() {
@@ -13,6 +13,7 @@ export function subscriber() {
 		.headers({
 			"X-XSS-Protection": "0"
 		})
+		.decorate("db", tasksDb())
 		.guard({
 			headers: t.Object({
 				"authorization": t.String(),
@@ -34,13 +35,7 @@ export function subscriber() {
 						message: "Subscriber not found"
 					});
 				}
-				return {
-					id: ctx.id,
-					name: subscriber.subscriberName,
-					createdAt: subscriber.createdAt,
-					tasksInQueue: subscriber.tasksInQueue,
-					tasksInQueueLimit: subscriber.tasksInQueueLimit
-				};
+				return subscriber;
 			}, {
 				detail: {
 					tags: ["Subscriber"],
@@ -122,7 +117,7 @@ export function subscriber() {
 				type: "json"
 			})
 		)
-		.decorate("db", tasksDb())
+		.decorate("stmtSubscriberRegistered", stmtSubscriberRegistered())
 		.derive({ as: "scoped" }, () => ({
 			today: Date.now()
 		}))
@@ -149,10 +144,11 @@ export function subscriber() {
 			};
 		}, {
 			transform(ctx) {
-				ctx.body.name = deburr(ctx.body.name).trim();
+				ctx.body.name = deburr(ctx.body.name).toLowerCase().trim();
 			},
 			beforeHandle(ctx) {
-				if (isSubscriberRegistered(ctx.db, ctx.body.name)) {
+				const isSubscriberRegistered = !!ctx.stmtSubscriberRegistered.get(ctx.body.name)?.isRegistered;
+				if (isSubscriberRegistered) {
 					return ctx.error("Conflict", {
 						message: "Subscriber has already registered"
 					});
@@ -184,15 +180,7 @@ export function subscriber() {
 		});
 }
 
-function isSubscriberRegistered(db: Database, name: string) {
-	const q = db.query("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?) AS isRegistered;");
-	const value = q.get(name) as { isRegistered: number };
-	q.finalize();
-	const isRegistered = !!value.isRegistered;
-	return isRegistered;
-};
-
-function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksInQueue" | "tasksInQueueLimit">) {
+function addSubscriber(db: Database, ctx: Omit<SubscriberTable, "id" | "tasksInQueue" | "tasksInQueueLimit">) {
 	db.run("INSERT INTO subscriber (subscriberId, subscriberName, createdAt, key) VALUES (?1, ?2, ?3, ?4);", [
 		ctx.subscriberId,
 		ctx.subscriberName,
@@ -201,21 +189,32 @@ function addSubscriber(db: Database, ctx: Omit<SubscriberContext, "id" | "tasksI
 	]);
 };
 
+type SubscriberQuery = Omit<SubscriberTable, "id" | "key">;
+type SubscriberRes = Omit<SubscriberQuery, "subscriberId" | "subscriberName"> & { id: string, name: string }
+
 function getSubscriber(db: Database, id: string, name: string) {
-	const q = db.query("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 LIMIT 1;");
-	const value = q.get(id, name) as Omit<SubscriberContext, "id" | "key"> | null;
+	const q = db.query<SubscriberQuery, [string, string]>("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 LIMIT 1;");
+	const subscriber = q.get(id, name);
 	q.finalize();
-	if (value == null) {
+	if (subscriber == null) {
 		return null;
 	}
-	return value;
+	return {
+		id: subscriber.subscriberId,
+		name: subscriber.subscriberName,
+		createdAt: subscriber.createdAt,
+		tasksInQueue: subscriber.tasksInQueue,
+		tasksInQueueLimit: subscriber.tasksInQueueLimit
+	} as SubscriberRes;
 };
 
+type TasksInQueueQuery = Pick<SubscriberTable, "tasksInQueue">
+
 function deleteSubscriber(db: Database, id: string, name: string) {
-	const q = db.query("SELECT tasksInQueue FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 LIMIT 1;");
-	const value = q.get(id, name) as Pick<SubscriberContext, "tasksInQueue"> | null;
+	const q = db.query<TasksInQueueQuery, [string, string]>("SELECT tasksInQueue FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 LIMIT 1;");
+	const subscriber = q.get(id, name);
 	q.finalize();
-	if (value == null) {
+	if (subscriber == null) {
 		return null;
 	}
 	db.run("DELETE FROM subscriber WHERE subscriberId = ?;", [id]);

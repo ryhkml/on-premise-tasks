@@ -1,13 +1,13 @@
 import { Observable, timeout } from "rxjs";
 
 interface FetchRes {
-	data: string | null;
+	data: string | Buffer | null;
 	state: "DONE" | "ERROR";
 	status: number;
 	statusText: string;
 }
 
-export function fetchHttp(req: TaskSubscriberRequest, additionalHeaders?: { [k: string]: string }) {
+export function fetchHttp(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: string }) {
 	const source$ = new Observable<FetchRes>(observer => {
 		let headers = {};
 		if (req.httpRequest.headers) {
