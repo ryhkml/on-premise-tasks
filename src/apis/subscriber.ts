@@ -6,13 +6,19 @@ import { deburr } from "lodash";
 import { monotonicFactory } from "ulid";
 
 import { stmtSubscriberRegistered, tasksDb } from "../db";
-import { pluginAuth } from "../auth/auth";
+import { pluginAuth } from "../plugins/auth";
+import { pluginContentLength } from "../plugins/content-length";
 
 export function subscriber() {
 	return new Elysia({ prefix: "/subscribers" })
 		.headers({
 			"X-XSS-Protection": "0"
 		})
+		.onAfterHandle(ctx => {
+			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+			ctx.set.headers["Expires"] = "0";
+		})
+		.use(pluginContentLength())
 		.decorate("db", tasksDb())
 		.guard({
 			headers: t.Object({
@@ -76,7 +82,6 @@ export function subscriber() {
 				type: "json"
 			})
 			.delete("/:name", ctx => {
-				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const isDeleted = deleteSubscriber(ctx.db, ctx.id, ctx.params.name);
 				if (isDeleted == null) {
 					return ctx.error("Unprocessable Content", {
@@ -136,7 +141,6 @@ export function subscriber() {
 				createdAt: ctx.today,
 				key: secretKey
 			});
-			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 			ctx.set.status = "Created";
 			return {
 				id,

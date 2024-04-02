@@ -10,7 +10,8 @@ import { BehaviorSubject, TimeoutError, catchError, defer, delay, filter, finali
 import { defer as deferLd, kebabCase, toSafeInteger } from "lodash";
 
 import { fetchHttp } from "../utils/fetch";
-import { pluginAuth } from "../auth/auth";
+import { pluginAuth } from "../plugins/auth";
+import { pluginContentLength } from "../plugins/content-length";
 import { decr, encr } from "../utils/crypto";
 import { stmtSubscriberTasksInQueue, tasksDb } from "../db";
 
@@ -19,6 +20,11 @@ export function queue() {
 		.headers({
 			"X-XSS-Protection": "0"
 		})
+		.onAfterHandle(ctx => {
+			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+			ctx.set.headers["Expires"] = "0";
+		})
+		.use(pluginContentLength())
 		.use(pluginAuth())
 		.state("queues", [] as Array<QueueSafe>)
 		.decorate("db", tasksDb())
@@ -61,7 +67,6 @@ export function queue() {
 
 			})
 			.patch("/:id/pause", ctx => {
-				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
 				const pause = pauseQueue(ctx.db, ctx.params.id);
 				if (index == -1 || pause == null) {
@@ -84,7 +89,6 @@ export function queue() {
 				}
 			})
 			.patch("/:id/resume", ctx => {
-				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const resume = resumeQueue(ctx.db, ctx.params.id);
 				if (resume == null) {
 					return ctx.error("Unprocessable Content", {
@@ -114,7 +118,6 @@ export function queue() {
 				}
 			})
 			.patch("/:id/unsubscribe", ctx => {
-				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
 				if (index == -1) {
 					return ctx.error("Bad Request", {
@@ -130,7 +133,6 @@ export function queue() {
 				type: "json"
 			})
 			.delete("/:id", ctx => {
-				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 				if (ctx.query.force) {
 					const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
 					if (index == -1) {
@@ -191,7 +193,6 @@ export function queue() {
 		})
 		.decorate("stmtSubscriberTasksInQueue", stmtSubscriberTasksInQueue())
 		.post("/register", ctx => {
-			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
 			ctx.set.status = "Created";
 			return registerQueue(ctx);
 		}, {

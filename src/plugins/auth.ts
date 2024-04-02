@@ -9,7 +9,7 @@ import { stmtSubscriberKey } from "../db";
 export function pluginAuth() {
 	return new Elysia({ name: "pluginAuth" })
 		.decorate("stmtSubscriberKey", stmtSubscriberKey())
-		.derive({ as: "global" }, ctx => {
+		.derive({ as: "scoped" }, ctx => {
 			const auth = ctx.headers["authorization"];
 			return {
 				id: toString(ctx.headers["x-tasks-subscriber-id"]).trim(),
@@ -19,7 +19,7 @@ export function pluginAuth() {
 				today: Date.now()
 			};
 		})
-		.onBeforeHandle({ as: "global" }, async ctx => {
+		.onBeforeHandle({ as: "scoped" }, async ctx => {
 			if (ctx.id == "" || ctx.key == "") {
 				return ctx.error("Unauthorized", {
 					message: "The request did not include valid authentication"

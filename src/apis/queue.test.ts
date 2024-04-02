@@ -38,7 +38,7 @@ describe("Test API", () => {
 	});
 
 	describe("GET /queues/:id", () => {
-		it("should successful get queue", async () => {
+		it("should successfully get the queue", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -76,7 +76,7 @@ describe("Test API", () => {
 	});
 
 	describe("POST /queues/register", () => {
-		it("should successful register queue and wait 3000ms until the task has been successfully executed", async () => {
+		it("should successfully register the queue and wait 3000 milliseconds until the task has been successfully executed", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -104,7 +104,7 @@ describe("Test API", () => {
 			expect(state).toBe("DONE");
 			expect(statusCode).toBe(200);
 		});
-		it("should successful register queue and wait 3000ms until the task gives an error response", async () => {
+		it("should successfully register the queue and wait 3000 milliseconds until the task returns an error response", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -131,7 +131,7 @@ describe("Test API", () => {
 			const { state } = q.get(data?.id!)!;
 			expect(state).toBe("ERROR");
 		});
-		it("should respond status code 400 if the execution time is earlier than the current time", async () => {
+		it("should respond with status code 400 if the execution time is earlier than the current time.", async () => {
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
@@ -149,7 +149,7 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(400);
 		});
-		it("should respond status code 400 if the \"retryAt\" execution time is earlier than the execution time", async () => {
+		it("should respond with status code 400 if the \"retryAt\" execution time is earlier than the execution time", async () => {
 			const dueTime = 3000;
 			const estimateExecutionTime = addMilliseconds(Date.now(), dueTime).getTime();
 			const { status } = await queueApi.queues.register.post({
@@ -170,7 +170,7 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(400);
 		});
-		it("should respond status code 429 if tasks in queue greater than tasks in queue limit", async () => {
+		it("should respond with status code 429 if the number of tasks in queue is greater than the task in queue limit", async () => {
 			db.run("UPDATE subscriber SET tasksInQueue = 1000 WHERE subscriberName = ?;", [name]);
 			const dueTime = 3000;
 			const { status } = await queueApi.queues.register.post({
@@ -190,7 +190,7 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(429);
 		});
-		it("should retrying 3 times if task gives an error response", async () => {
+		it("should retry 3 times if the task gives an error response", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -224,7 +224,7 @@ describe("Test API", () => {
 	});
 
 	describe("PATCH /queues/:id/pause", () => {
-		it("should successful pause queue", async () => {
+		it("should successfully pause the queue", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -262,7 +262,7 @@ describe("Test API", () => {
 	});
 
 	describe("PATCH /queues/:id/resume", () => {
-		it("should successful pause queue and then resume queue", async () => {
+		it("should successfully pause the queue and then resume queue", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -321,7 +321,7 @@ describe("Test API", () => {
 	});
 
 	describe("PATCH /queues/:id/unsubscribe", () => {
-		it("should successful unsubscribe queue", async () => {
+		it("should successfully unsubscribe the queue", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -356,7 +356,7 @@ describe("Test API", () => {
 	});
 
 	describe("DELETE /queues/:id", () => {
-		it("should successful delete queue", async () => {
+		it("should successfully delete the queue", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -394,7 +394,7 @@ describe("Test API", () => {
 			const queue = q.get(data?.id!);
 			expect(queue).toBe(null);
 		});
-		it("should successful force delete queue", async () => {
+		it("should successfully force delete the queue", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -432,7 +432,7 @@ describe("Test API", () => {
 			const queue = q.get(data?.id!);
 			expect(queue).toBe(null);
 		});
-		it("should respond status code 422 if tasks in queue will be deleted without force", async () => {
+		it("should respond with status code 422 if tasks in queue are deleted without force", async () => {
 			const dueTime = 3000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {

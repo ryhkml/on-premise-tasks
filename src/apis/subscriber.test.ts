@@ -26,7 +26,7 @@ describe("Test API", () => {
 	});
 
 	describe("GET /subscribers/:name", () => {
-		it("should successful get subscriber", async () => {
+		it("should successfully get the subscriber", async () => {
 			const { data, status } = await subscriberApi.subscribers({ name }).get({
 				headers: {
 					"authorization": "Bearer " + key,
@@ -40,7 +40,7 @@ describe("Test API", () => {
 			expect(data?.tasksInQueue).toBeDefined();
 			expect(data?.tasksInQueueLimit).toBeDefined();
 		});
-		it("should respond status code 404 if subscriber name doesn't exists", async () => {
+		it("should respond with status code 404 if the subscriber name does not exist", async () => {
 			const { status } = await subscriberApi.subscribers({ name: "dummy" }).get({
 				headers: {
 					"authorization": "Bearer " + key,
@@ -52,28 +52,28 @@ describe("Test API", () => {
 	});
 
 	describe("POST /subscribers/register", () => {
-		it("should the subscriber not registered", () => {
+		it("should the subscriber not be registered", () => {
 			stmtS.run(name);
 			const q = db.query<{ isRegistered: 0 | 1 }, string>("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?) AS isRegistered;");
 			const subscriber = q.get(name)!;
 			const notExists = !!subscriber.isRegistered;
 			expect(notExists).toBe(false);
 		});
-		it("should successful register subscriber", async () => {
+		it("should successfully register the subscriber", async () => {
 			stmtS.run(name);
 			const { data, status } = await subscriberApi.subscribers.register.post({ name });
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			expect(data?.key).toBeDefined();
 		});
-		it("should respond status code 409 if subscriber already registered", async () => {
+		it("should respond with status code 409 if the subscriber is already registered", async () => {
 			const { status } = await subscriberApi.subscribers.register.post({ name });
 			expect(status).toBe(409);
 		});
 	});
 
 	describe("DELETE /subscribers/:name", () => {
-		it("should successful delete subscriber", async () => {
+		it("should successfully delete the subscriber", async () => {
 			const { data, status } = await subscriberApi.subscribers({ name }).delete(null, {
 				headers: {
 					"authorization": "Bearer " + key,
@@ -83,7 +83,7 @@ describe("Test API", () => {
 			expect(status).toBe(200);
 			expect(data?.message).toBeDefined();
 		});
-		it("should respond status code 422 if subscriber tasks in queue greater than or equal to 1", async () => {
+		it("should respond with status code 422 if the number of subscriber tasks in queue is greater than or equal to 1", async () => {
 			db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberName = ?;", [name]);
 			const { status } = await subscriberApi.subscribers({ name }).delete(null, {
 				headers: {

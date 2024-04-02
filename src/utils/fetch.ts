@@ -37,6 +37,7 @@ export function fetchHttp(req: TaskSubscriberReq, additionalHeaders?: { [k: stri
 			headers: {
 				...headers,
 				"Cache-Control": "no-cache, no-store, must-revalidate",
+				"Expires": "0",
 				"User-Agent": "Op-Tasks/1.0.0"
 			}
 		})

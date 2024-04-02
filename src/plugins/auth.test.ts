@@ -25,7 +25,7 @@ describe("Test AUTH", () => {
 		stmtS.run(name);
 	});
 
-	it("should respond argon2id hash algorithm with memory cost 4 and time cost 3", async () => {
+	it("should respond with the Argon2id hash algorithm with a memory cost of 4 and a time cost of 3", async () => {
 		const q = db.query<Pick<SubscriberTable, "key">, string>("SELECT key FROM subscriber WHERE subscriberId = ? LIMIT 1;");
 		const secret = q.get(id);
 		expect(secret?.key).toBeDefined();
@@ -33,7 +33,7 @@ describe("Test AUTH", () => {
 		const isValid = await password.verify(key, secret?.key!, "argon2id");
 		expect(isValid).toBe(true);
 	});
-	it("should respond status code 401 if subscriber key and subscriber id is empty", async () => {
+	it("should respond with status code 401 if the subscriber key and subscriber id are empty", async () => {
 		const { status } = await subscriberApi.subscribers({ name }).get({
 			headers: {
 				"authorization": "",
@@ -42,7 +42,7 @@ describe("Test AUTH", () => {
 		});
 		expect(status).toBe(401);
 	});
-	it("should respond status code 401 if subscriber id is invalid", async () => {
+	it("should respond with status code 401 if the subscriber id is invalid", async () => {
 		const { status } = await subscriberApi.subscribers({ name }).get({
 			headers: {
 				"authorization": "Bearer " + key,
@@ -51,7 +51,7 @@ describe("Test AUTH", () => {
 		});
 		expect(status).toBe(401);
 	});
-	it("should respond status code 403 if subscriber key is invalid", async () => {
+	it("should respond with status code 403 if the subscriber key is invalid", async () => {
 		const { status } = await subscriberApi.subscribers({ name }).get({
 			headers: {
 				"authorization": "Bearer dummy",
