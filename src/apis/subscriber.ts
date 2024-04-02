@@ -4,6 +4,7 @@ import { Database } from "bun:sqlite";
 import { Elysia, t } from "elysia";
 import { deburr } from "lodash";
 import { monotonicFactory } from "ulid";
+import { customAlphabet } from "nanoid";
 
 import { stmtSubscriberRegistered, tasksDb } from "../db";
 import { pluginAuth } from "../plugins/auth";
@@ -129,7 +130,7 @@ export function subscriber() {
 		.post("/register", async ctx => {
 			const ulid = monotonicFactory();
 			const id = ulid(ctx.today);
-			const key = "t-" + Buffer.from(id + ":" + ctx.today).toString("base64");
+			const key = genKey();
 			const secretKey = await password.hash(key, {
 				algorithm: "argon2id",
 				memoryCost: 4,
@@ -161,8 +162,9 @@ export function subscriber() {
 			body: t.Object({
 				name: t.String({
 					default: "",
-					minLength: 3,
-					maxLength: 32
+					minLength: 5,
+					maxLength: 32,
+					pattern: "^(?![0-9-])(?!.*--)[a-z0-9-]{5,32}(?<!-)$"
 				})
 			}),
 			detail: {
@@ -224,3 +226,8 @@ function deleteSubscriber(db: Database, id: string, name: string) {
 	db.run("DELETE FROM subscriber WHERE subscriberId = ?;", [id]);
 	return "Done";
 };
+
+function genKey() {
+	const key = customAlphabet("0123456789abcdefghijklmnopqrsuvwxyzABCDEFGHIJKLMNOPQRSUVWXYZ", 48);
+	return "t-" + key();
+}
