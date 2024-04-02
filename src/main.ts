@@ -1,8 +1,9 @@
-import { env } from "bun";
+import { env, file } from "bun";
 
 import { exit } from "node:process";
 
 import { Elysia } from "elysia";
+import { catchError, defer, forkJoin, of, switchMap, take } from "rxjs";
 
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
@@ -34,8 +35,22 @@ const app = new Elysia()
 	.use(subscriber())
 	.use(queue());
 
-connectivity().subscribe({
-	next() {
+connectivity().pipe(
+	switchMap(() => forkJoin([
+		defer(() => file(env.PATH_TLS_CERT!).text()).pipe(
+			catchError(() => of(""))
+		),
+		defer(() => file(env.PATH_TLS_KEY!).text()).pipe(
+			catchError(() => of(""))
+		),
+		defer(() => file(env.PATH_TLS_CA!).text()).pipe(
+			catchError(() => of(""))
+		)
+	])),
+	take(1)
+)
+.subscribe({
+	next([cert, key, ca]) {
 		console.log("Connectivity ok!");
 		if (env.TZ == "UTC") {
 			console.log("Timezone ok!");
@@ -43,14 +58,27 @@ connectivity().subscribe({
 			console.error("Set env variable \"TZ\" to UTC");
 			exit(1);
 		}
-		app.listen(+env.PORT! || 3200);
+		if (cert == "" || key == "") {
+			app.listen(+env.PORT! || 3200);
+		} else {
+			app.listen({
+				port: +env.PORT! || 3200,
+				cert,
+				key,
+				ca
+			});
+		}
 		if (app.decorator.db.filename) {
 			console.log("Database ok!");
 		} else {
 			console.error("Database is empty");
 			exit(1);
 		}
-		console.log("Server listening on port", app.server?.port);
+		if (app.server?.url.protocol == "https:") {
+			console.log("Secure server listening on", app.server?.url.origin);
+		} else {
+			console.log("Server listening on", app.server?.url.origin);
+		}
 	},
 	error(err) {
 		console.error(err);

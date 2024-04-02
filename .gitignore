@@ -47,6 +47,18 @@ package-lock.json
 # DB
 db/tasks.*
 db/test/tasks.*
+db/*.db*
+db/*.sqlite*
+db/test/*.db*
+db/test/*.sqlite*
 
 # Bin
 tasks
+
+# TLS/SSL
+tls/*.ca
+tls/*.crt
+tls/*.csr
+tls/*.cert
+tls/*.key
+tls/*.pem
