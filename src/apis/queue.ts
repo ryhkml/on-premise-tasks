@@ -7,7 +7,7 @@ import { Elysia, t } from "elysia";
 
 import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
 import { BehaviorSubject, TimeoutError, catchError, defer, delay, filter, finalize, interval, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
-import { defer as deferLd, kebabCase, toSafeInteger } from "lodash";
+import { defer as deferLd, kebabCase, toSafeInteger, toString } from "lodash";
 
 import { fetchHttp } from "../utils/fetch";
 import { pluginAuth } from "../plugins/auth";
@@ -495,7 +495,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 							data: null,
 							state: "UNKNOWN",
 							status: 500,
-							statusText: String(error)
+							statusText: toString(error)
 						}));
 					}),
 					retry({
@@ -570,7 +570,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 function registerQueue(ctx: SubscriptionContext) {
 	const queueId = genId(ctx.today);
 	const configId = genId(ctx.today);
-	const key = kebabCase(ctx.db.filename) + ":" + configId;
+	const key = genKey(configId);
 	const dueTime = !!ctx.body.config.executeAt
 		? new Date(ctx.body.config.executeAt)
 		: ctx.body.config.executionDelay;
@@ -681,7 +681,7 @@ function getQueue(db: Database, queueId: string) {
 
 function transformQueue(db: Database, queue: ResumeQueueQuery, beforeAt: number, terminated = false) {
 	const transformAt = Date.now();
-	const key = kebabCase(db.filename) + ":" + queue.configId;
+	const key = genKey(queue.configId);
 	const body = {
 		httpRequest: {
 			url: decr(queue.url, key),
@@ -807,6 +807,10 @@ function trackLastRecord(db: Database) {
 			stmt.run();
 		}
 	});
+}
+
+function genKey(configId: string) {
+	return toString(env.CIPHER_KEY) + ":" + configId;
 }
 
 function genId(dateAt: number, start = 8, size = 10) {

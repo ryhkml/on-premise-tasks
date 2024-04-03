@@ -35,6 +35,10 @@ CIPHER_KEY=
 # Default: google.com
 CONNECTIVITY_HOSTNAME=
 
+# Maximum size of the body request in bytes
+# Default: 32kb
+MAX_SIZE_BODY_REQUEST=32768
+
 # Configure TLS/SSL to run the server with HTTPS protocol.
 # Use the tls directory to store TLS/SSL certificates
 # Default: EMPTY

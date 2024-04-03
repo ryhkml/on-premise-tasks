@@ -1,7 +1,9 @@
+import { env } from "bun";
+
 import { Elysia } from "elysia";
 import { toSafeInteger } from "lodash";
 
-export function pluginContentLength(maxSize: number = 65536) {
+export function pluginContentLength(maxSize: number = toSafeInteger(env.MAX_SIZE_BODY_REQUEST)) {
 	return new Elysia({ name: "pluginContentLength", seed: maxSize })
 		.onBeforeHandle({ as: "scoped" }, ctx => {
 			const len = toSafeInteger(ctx.request.headers.get("content-length"));

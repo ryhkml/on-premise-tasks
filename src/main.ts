@@ -4,6 +4,7 @@ import { exit } from "node:process";
 
 import { Elysia } from "elysia";
 import { catchError, defer, forkJoin, of, switchMap, take } from "rxjs";
+import { toSafeInteger } from "lodash";
 
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
@@ -51,29 +52,23 @@ connectivity().pipe(
 )
 .subscribe({
 	next([cert, key, ca]) {
-		console.log("Connectivity ok!");
-		if (env.TZ == "UTC") {
-			console.log("Timezone ok!");
+		console.log("\x1b[32mConnectivity ok!\x1b[0m");
+		if (env.TZ != "UTC") {
+			console.log("\x1b[33mTime zone is not using UTC. Make sure the UNIX time request has the same time zone as the server\x1b[0m");
 		} else {
-			console.error("Set env variable \"TZ\" to UTC");
+			console.log("\x1b[32mTimezone ok!\x1b[0m");
+		}
+		if (env.CIPHER_KEY == null) {
+			console.error("Set the value of the CIPHER_KEY environment variable first");
 			exit(1);
 		}
-		if (cert == "" || key == "") {
-			app.listen(+env.PORT! || 3200);
-		} else {
-			app.listen({
-				port: +env.PORT! || 3200,
-				cert,
-				key,
-				ca
-			});
-		}
-		if (app.decorator.db.filename) {
-			console.log("Database ok!");
-		} else {
-			console.error("Database is empty");
-			exit(1);
-		}
+		app.listen({
+			maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST),
+			port: toSafeInteger(env.PORT) || 3200,
+			cert: cert || undefined,
+			key: key || undefined,
+			ca: ca || undefined
+		});
 		if (app.server?.url.protocol == "https:") {
 			console.log("Secure server listening on", app.server?.url.origin);
 		} else {
