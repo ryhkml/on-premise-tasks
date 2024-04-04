@@ -18,25 +18,25 @@ Your app                        Tasks server                Target server
 3. Scheduling
 
 ## Getting Started
-To get started with this template, simply paste this command into your terminal:
+To get started with this app, simply paste this command into your terminal:
 ```bash
 ./init.sh
 ```
 
 ## Development
-To start the development server run:
+To start the development server, run:
 ```bash
 bun run dev
 ```
 
 ## Test
-To start the test server run:
+To start the test server, run:
 ```bash
 bun run test
 ```
 
 ## Single-file executable
-To start the single-file executable run:
+To start the single-file executable, run:
 ```bash
 # Compile
 bun run bin
@@ -45,7 +45,7 @@ NODE_ENV=production ./tasks
 ```
 
 ## Docker build
-To start the docker build:
+To start the docker build, run:
 ```bash
 # Build
 docker compose -p <STACK_NAME> --env-file .env.production up -d --build
@@ -103,7 +103,6 @@ type TasksConfig = {
 ```
 An example of requesting a Task
 ```json
-// req.json
 {
     "httpRequest": {
         "url": "https://api.starlink.com",
@@ -139,7 +138,6 @@ And so on...
 ```
 Additionally, you can make a specific request by using `executeAt`
 ```json
-// req.json
 {
     "httpRequest": {
         "url": "https://api.starlink.com",
