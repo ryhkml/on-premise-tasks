@@ -1,20 +1,18 @@
-import { argv, env, file, write } from "bun";
+import { env, file, write } from "bun";
 import { Database } from "bun:sqlite";
+
+import { cwd } from "node:process";
+import { join } from "node:path";
 
 import { firstValueFrom, timer } from "rxjs";
 
 async function initDb() {
 	try {
 		const initAt = Date.now();
-		let path = env.PATH_SQLITE;
-		let isDev = env.LEVEL == "DEV";
-		if (argv[2]?.trim().toLowerCase() == "test") {
-			path = env.PATH_TEST_SQLITE
-			isDev = true;
+		if (env.PATH_SQLITE == null) {
+			throw new Error("Database path is empty");
 		}
-		if (path == null) {
-			throw new Error("env PATH_SQLITE is empty");
-		}
+		const path = join(cwd(), env.PATH_SQLITE);
 		const db = new Database(path);
 		await write(path, "");
 		await firstValueFrom(timer(1000));
@@ -35,7 +33,7 @@ async function initDb() {
 			db.run(t4);
 			db.run("INSERT INTO timeframe (lastRecordAt) VALUES (?);", [initAt]);
 		})();
-		console.log("The table was created successfully", ">>", path);
+		console.log("\x1b[32mThe table was created successfully\x1b[0m");
 	} catch (e) {
 		console.error(e);
 	}

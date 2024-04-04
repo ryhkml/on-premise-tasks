@@ -125,7 +125,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime + 1000));
+			await firstValueFrom(timer(dueTime * 2));
 			// ...
 			const q = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE queueId = ?;");
 			const { state } = q.get(data?.id!)!;

@@ -1,18 +1,19 @@
 import { env } from "bun";
 import { Database } from "bun:sqlite";
 
+import { cwd, exit } from "node:process";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 export function tasksDb() {
-	let path = env.PATH_SQLITE;
-	if (env.LEVEL == "DEV") {
-		path = env.PATH_TEST_SQLITE;
+	if (env.PATH_SQLITE == null) {
+		console.error("Database path is empty");
+		exit(1);
 	}
-	if (path == null) {
-		throw new Error("env PATH_SQLITE is empty");
-	}
+	const path = join(cwd(), env.PATH_SQLITE);
 	if (!existsSync(path)) {
-		throw new Error("Database file not found");
+		console.error("Database file not found");
+		exit(1);
 	}
 	return new Database(path);
 }

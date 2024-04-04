@@ -392,9 +392,6 @@ export function queue() {
 					ctx.store.queues = ctx.store.queues.filter(queue => !queue.subscription?.closed);
 				}
 			});
-			if (env.NODE_ENV == "test") {
-				return;
-			}
 			deferLd(() => {
 				let resubscribes = resubscribeQueue(ctx.decorator.db);
 				if (resubscribes == null || resubscribes.length == 0) {

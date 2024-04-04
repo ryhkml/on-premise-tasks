@@ -21,6 +21,7 @@ dummy-db.ts
 *.pem
 note.txt
 .env
+.env.*
 
 # debug
 npm-debug.log*

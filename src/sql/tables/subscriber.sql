@@ -1,4 +1,6 @@
-CREATE TABLE subscriber (
+DROP TABLE IF EXISTS subscriber;
+
+CREATE TABLE IF NOT EXISTS subscriber (
 	id					INTEGER PRIMARY KEY AUTOINCREMENT,
 	subscriberId 		TEXT UNIQUE NOT NULL,
 	subscriberName 		TEXT UNIQUE NOT NULL,

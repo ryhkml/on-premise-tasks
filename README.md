@@ -26,19 +26,31 @@ To get started with this template, simply paste this command into your terminal:
 ## Development
 To start the development server run:
 ```bash
-bun dev
+bun run dev
 ```
 
 ## Test
 To start the test server run:
 ```bash
-bun test
+bun run test
 ```
 
 ## Single-file executable
 To start the single-file executable run:
 ```bash
-bun bin
+# Compile
+bun run bin
+# Run
+NODE_ENV=production ./tasks
+```
+
+## Docker build
+To start the docker build:
+```bash
+# Build
+docker compose -p <STACK_NAME> --env-file .env.production up -d --build
+# Down
+docker compose -p <STACK_NAME> down
 ```
 
 ## API

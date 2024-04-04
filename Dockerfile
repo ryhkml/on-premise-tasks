@@ -1,10 +1,5 @@
 # Build stage
-FROM debian:12 AS build
-
-ARG PATH_SQLITE
-
-ENV TZ=UTC
-ENV PATH_SQLITE=$PATH_SQLITE
+FROM oven/bun:debian AS build
 
 WORKDIR /app
 
@@ -13,35 +8,27 @@ COPY package.json ./
 COPY init-db.ts ./
 COPY bun.lockb ./
 COPY src ./src/
+COPY .env.production ./
 
-RUN apt update && \
-    apt install curl unzip -y && \
-    curl https://bun.sh/install | bash && \
-    /root/.bun/bin/bun install --frozen-lockfile --production && \
+RUN bun install --frozen-lockfile --production && \
     mkdir db && \
-    /root/.bun/bin/bun run init-db.ts && \
-    /root/.bun/bin/bun test && \
-    rm -rf ./db/tasks.* && \
-    /root/.bun/bin/bun run init-db.ts && \
-    /root/.bun/bin/bun build --compile --minify --sourcemap ./src/main.ts --outfile ./tasks
+    bun --env-file=.env.production run init-db.ts && \
+    bun --env-file=.env.production test --timeout 10000 && \
+    bun --env-file=.env.production run init-db.ts && \
+    bun build --compile --minify --sourcemap ./src/main.ts --outfile ./tasks
 
 # Final stage
 FROM gcr.io/distroless/base-debian12
 
-ARG PORT
-ARG PATH_SQLITE
-
 LABEL maintainer="Reyhan Kamil <mail@ryhkml.dev>"
 
-ENV TZ=UTC
-ENV PORT=$PORT
-ENV PATH_SQLITE=$PATH_SQLITE
+ARG PORT
 
 WORKDIR /app
 
 COPY --from=build /app/db ./db/
 COPY --from=build /app/tasks ./
 
-EXPOSE $PORT
+EXPOSE $PORT/tcp
 
-CMD ["./tasks"]
+CMD ["/app/tasks"]
