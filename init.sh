@@ -75,10 +75,11 @@ PATH_TLS_KEY=
 PATH_TLS_CERT=
 EOF
 
-echo ".env file created"
+echo ".env.development file has been created"
+echo ".env.production file has been created"
 
 bun install
-bun init-db.ts test
-bun test --timeout 10000
+bun run reinit:testdb
+bun run test
 
 echo "On-Premise Tasks is ready to serve"
