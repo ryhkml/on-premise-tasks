@@ -1,16 +1,17 @@
 import { env } from "bun";
 import { Database } from "bun:sqlite";
 
-import { cwd, exit } from "node:process";
+import { exit } from "node:process";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+
+import { cwd } from "./utils/cwd";
 
 export function tasksDb() {
 	if (env.PATH_SQLITE == null) {
 		console.error("Database path is empty");
 		exit(1);
 	}
-	const path = join(cwd(), env.PATH_SQLITE);
+	const path = cwd(env.PATH_SQLITE);
 	if (!existsSync(path)) {
 		console.error("Database file not found");
 		exit(1);

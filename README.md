@@ -33,6 +33,8 @@ bun run dev
 To start the test server, run:
 ```bash
 bun run test
+# For file specific test
+bun test <FILENAME>
 ```
 
 ## Single-file executable

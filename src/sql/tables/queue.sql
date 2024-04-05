@@ -1,6 +1,4 @@
-DROP TABLE IF EXISTS queue;
-
-CREATE TABLE IF NOT EXISTS queue (
+CREATE TABLE queue (
 	id 						INTEGER PRIMARY KEY AUTOINCREMENT,
 	queueId 				TEXT UNIQUE NOT NULL,
 	subscriberId 			TEXT NOT NULL,
@@ -11,7 +9,7 @@ CREATE TABLE IF NOT EXISTS queue (
 	FOREIGN KEY (subscriberId) REFERENCES subscriber(subscriberId) ON DELETE CASCADE
 );
 
-CREATE INDEX ixQueueId ON queue(queueId);
+CREATE UNIQUE INDEX ixQueueId ON queue(queueId);
 
 CREATE TRIGGER incrementTasksInQueue
 BEFORE INSERT ON queue

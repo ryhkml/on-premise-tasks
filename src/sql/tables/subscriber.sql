@@ -1,6 +1,4 @@
-DROP TABLE IF EXISTS subscriber;
-
-CREATE TABLE IF NOT EXISTS subscriber (
+CREATE TABLE subscriber (
 	id					INTEGER PRIMARY KEY AUTOINCREMENT,
 	subscriberId 		TEXT UNIQUE NOT NULL,
 	subscriberName 		TEXT UNIQUE NOT NULL,
@@ -10,6 +8,6 @@ CREATE TABLE IF NOT EXISTS subscriber (
 	tasksInQueueLimit 	INTEGER NULL DEFAULT 1000
 );
 
-CREATE INDEX ixSubscriberId ON subscriber(subscriberId);
+CREATE UNIQUE INDEX ixSubscriberId ON subscriber(subscriberId);
 
-CREATE INDEX ixSubscriberName ON subscriber(subscriberName);
+CREATE UNIQUE INDEX ixSubscriberName ON subscriber(subscriberName);

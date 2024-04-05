@@ -9,6 +9,7 @@ import { toSafeInteger } from "lodash";
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
 import { connectivity } from "./utils/connectivity";
+import { cwd } from "./utils/cwd";
 
 const app = new Elysia()
 	.headers({
@@ -38,13 +39,13 @@ const app = new Elysia()
 
 connectivity().pipe(
 	switchMap(() => forkJoin([
-		defer(() => file(env.PATH_TLS_CERT!).text()).pipe(
+		defer(() => file(cwd(env.PATH_TLS_CERT!)).text()).pipe(
 			catchError(() => of(""))
 		),
-		defer(() => file(env.PATH_TLS_KEY!).text()).pipe(
+		defer(() => file(cwd(env.PATH_TLS_KEY!)).text()).pipe(
 			catchError(() => of(""))
 		),
-		defer(() => file(env.PATH_TLS_CA!).text()).pipe(
+		defer(() => file(cwd(env.PATH_TLS_CA!)).text()).pipe(
 			catchError(() => of(""))
 		)
 	])),
