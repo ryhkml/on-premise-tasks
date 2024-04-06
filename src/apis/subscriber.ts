@@ -16,8 +16,10 @@ export function subscriber() {
 			"X-XSS-Protection": "0"
 		})
 		.onAfterHandle(ctx => {
-			ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
-			ctx.set.headers["Expires"] = "0";
+			if (ctx.request.method != "GET") {
+				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+				ctx.set.headers["Expires"] = "0";
+			}
 		})
 		.use(pluginContentLength())
 		.decorate("db", tasksDb())

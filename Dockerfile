@@ -6,6 +6,7 @@ WORKDIR /app
 COPY tsconfig.json ./
 COPY package.json ./
 COPY init-db.ts ./
+COPY bunfig.toml ./
 COPY bun.lockb ./
 COPY src ./src/
 COPY .env.production ./
