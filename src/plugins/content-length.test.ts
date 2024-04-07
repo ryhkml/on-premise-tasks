@@ -11,7 +11,10 @@ import { subscriber } from "../apis/subscriber";
 
 const subscriberApp = subscriber().listen(+env.PORT! || 3200);
 const subscriberApi = treaty(subscriberApp);
-const queueApp = queue().listen({ maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST), port: +env.PORT! || 3200 });
+const queueApp = queue().listen({
+	maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST) || 32768,
+	port: +env.PORT! || 3200
+});
 const queueApi = treaty(queueApp);
 const name = "test-content-length";
 const db = queueApp.decorator.db;

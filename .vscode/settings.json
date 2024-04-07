@@ -8,9 +8,11 @@
 	"[html]": {
 		"editor.tabSize": 4
 	},
+	"[yaml]": {
+		"editor.tabSize": 2
+	},
 	"editor.fontLigatures": true,
 	"editor.letterSpacing": 0.4,
-	"editor.tabSize": 4,
 	"editor.lineHeight": 1.6,
 	"editor.smoothScrolling": true
 }

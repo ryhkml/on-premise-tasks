@@ -59,12 +59,12 @@ connectivity().pipe(
 		} else {
 			console.log("\x1b[32mTimezone ok!\x1b[0m");
 		}
-		if (env.CIPHER_KEY == null) {
+		if (env.CIPHER_KEY == null || env.CIPHER_KEY.trim() == "") {
 			console.error("Set the value of the CIPHER_KEY environment variable first");
 			exit(1);
 		}
 		app.listen({
-			maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST),
+			maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST) || 32768,
 			port: toSafeInteger(env.PORT) || 3200,
 			cert: cert || undefined,
 			key: key || undefined,

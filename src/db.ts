@@ -11,12 +11,11 @@ export function tasksDb() {
 		console.error("Database path is empty");
 		exit(1);
 	}
-	const path = cwd(env.PATH_SQLITE);
-	if (!existsSync(path)) {
+	if (!existsSync(cwd(env.PATH_SQLITE))) {
 		console.error("Database file not found");
 		exit(1);
 	}
-	return new Database(path);
+	return new Database(cwd(env.PATH_SQLITE));
 }
 
 export function stmtSubscriberTasksInQueue() {
