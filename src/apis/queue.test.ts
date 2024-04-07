@@ -15,12 +15,10 @@ const queueApi = treaty(queueApp);
 const name = "test-queue";
 const db = queueApp.decorator.db;
 
-let queueId = "";
 let key = "";
 let id = "";
 
 describe("Test API", () => {
-	const stmtC = db.prepare<void, string>("DELETE FROM config WHERE queueId = ?;");
 	const stmtQ = db.prepare<void, string>("DELETE FROM queue WHERE subscriberId = ?;");
 	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
 
@@ -31,7 +29,6 @@ describe("Test API", () => {
 	});
 	afterEach(() => {
 		db.transaction(() => {
-			stmtC.run(queueId);
 			stmtQ.run(id);
 			stmtS.run(name);
 		})();
@@ -55,7 +52,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			const queue = await queueApi.queues({ id: data?.id! }).get({
@@ -93,7 +89,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
@@ -121,7 +116,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
@@ -210,7 +204,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for tasks
@@ -241,7 +234,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for task
@@ -279,7 +271,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// ...
@@ -338,7 +329,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for task
@@ -373,7 +363,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
@@ -411,7 +400,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
@@ -449,7 +437,6 @@ describe("Test API", () => {
 					"x-tasks-subscriber-id": id
 				}
 			});
-			queueId = data?.id!;
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task

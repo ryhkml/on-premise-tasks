@@ -25,3 +25,9 @@ BEGIN
     UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE subscriberId = NEW.subscriberId;
 	UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE queueId = NEW.queueId;
 END;
+
+CREATE TRIGGER deleteUnusedConfig
+AFTER DELETE ON queue
+BEGIN
+	DELETE FROM config WHERE NOT EXISTS (SELECT 'Done' AS deleted FROM queue WHERE queueId = OLD.queueId);
+END;

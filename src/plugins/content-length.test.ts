@@ -19,12 +19,10 @@ const queueApi = treaty(queueApp);
 const name = "test-content-length";
 const db = queueApp.decorator.db;
 
-let queueId = "";
 let key = "";
 let id = "";
 
 describe("Test CONTENT LENGTH", () => {
-	const stmtC = db.prepare<void, string>("DELETE FROM config WHERE queueId = ?;");
 	const stmtQ = db.prepare<void, string>("DELETE FROM queue WHERE subscriberId = ?;");
 	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
 
@@ -35,7 +33,6 @@ describe("Test CONTENT LENGTH", () => {
 	});
 	afterEach(() => {
 		db.transaction(() => {
-			stmtC.run(queueId);
 			stmtQ.run(id);
 			stmtS.run(name);
 		})();

@@ -138,12 +138,17 @@ export function subscriber() {
 				memoryCost: 4,
 				timeCost: 3
 			});
-			addSubscriber(ctx.db, {
+			const subscriber = addSubscriber(ctx.db, {
 				subscriberId: id,
 				subscriberName: ctx.body.name,
 				createdAt: ctx.today,
 				key: secretKey
 			});
+			if (subscriber == null) {
+				return ctx.error("Internal Server Error", {
+					message: "There was an error"
+				});
+			}
 			ctx.set.status = "Created";
 			return {
 				id,
@@ -189,12 +194,13 @@ export function subscriber() {
 }
 
 function addSubscriber(db: Database, ctx: Omit<SubscriberTable, "id" | "tasksInQueue" | "tasksInQueueLimit">) {
-	db.run("INSERT INTO subscriber (subscriberId, subscriberName, createdAt, key) VALUES (?1, ?2, ?3, ?4);", [
-		ctx.subscriberId,
-		ctx.subscriberName,
-		ctx.createdAt,
-		ctx.key
-	]);
+	const q = db.query<{ subscriberId: string }, [string, string, number, string]>("INSERT INTO subscriber (subscriberId, subscriberName, createdAt, key) VALUES (?1, ?2, ?3, ?4) RETURNING subscriberId;");
+	const subscriber = q.get(ctx.subscriberId, ctx.subscriberName, ctx.createdAt, ctx.key);
+	q.finalize();
+	if (subscriber == null) {
+		return null;
+	}
+	return subscriber.subscriberId;
 };
 
 type SubscriberQuery = Omit<SubscriberTable, "id" | "key">;
@@ -216,17 +222,14 @@ function getSubscriber(db: Database, id: string, name: string) {
 	} as SubscriberRes;
 };
 
-type TasksInQueueQuery = Pick<SubscriberTable, "tasksInQueue">
-
 function deleteSubscriber(db: Database, id: string, name: string) {
-	const q = db.query<TasksInQueueQuery, [string, string]>("SELECT tasksInQueue FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 LIMIT 1;");
-	const subscriber = q.get(id, name);
+	const q = db.query<{ deleted: "Done" }, [string, string]>("DELETE FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 RETURNING 'Done' AS deleted;");
+	const value = q.get(id, name);
 	q.finalize();
-	if (subscriber == null) {
+	if (value == null) {
 		return null;
 	}
-	db.run("DELETE FROM subscriber WHERE subscriberId = ?;", [id]);
-	return "Done";
+	return value.deleted;
 };
 
 function genKey() {
