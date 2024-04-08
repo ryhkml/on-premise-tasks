@@ -55,6 +55,15 @@ docker compose -p <STACK_NAME> --env-file .env.production up -d --build
 docker compose -p <STACK_NAME> down
 ```
 
+## Path configuration
+You can use absolute path or current path, for example:
+```ts
+// Absolute path
+"/etc/tasks/db/tasks.db"
+// Current path
+"./db/tasks.db"
+```
+
 ## API
 ### Subscriber
 - `GET /subscribers/:name` ✅

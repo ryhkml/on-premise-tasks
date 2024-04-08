@@ -18,7 +18,7 @@ LOG=1
 PORT=
 
 # Path to the SQLite Database file
-PATH_SQLITE="db/test/tasks.db"
+PATH_SQLITE="./db/test/tasks.db"
 
 # The cipher key to encrypt sensitive data before it enters the database.
 # Make sure to use a random character value.
@@ -51,7 +51,7 @@ TZ="UTC"
 PORT=
 
 # Path to the SQLite Database file
-PATH_SQLITE="db/tasks.db"
+PATH_SQLITE="./db/tasks.db"
 
 # The cipher key to encrypt sensitive data before it enters the database.
 # Make sure to use a random character value.

@@ -9,7 +9,6 @@ import { toSafeInteger } from "lodash";
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
 import { connectivity } from "./utils/connectivity";
-import { cwd } from "./utils/cwd";
 
 const app = new Elysia()
 	.headers({
@@ -39,21 +38,30 @@ const app = new Elysia()
 
 connectivity().pipe(
 	switchMap(() => forkJoin([
-		defer(() => file(cwd(env.PATH_TLS_CERT!)).text()).pipe(
+		defer(() => file(env.PATH_TLS_CERT!).text()).pipe(
 			catchError(() => of(""))
 		),
-		defer(() => file(cwd(env.PATH_TLS_KEY!)).text()).pipe(
+		defer(() => file(env.PATH_TLS_KEY!).text()).pipe(
 			catchError(() => of(""))
 		),
-		defer(() => file(cwd(env.PATH_TLS_CA!)).text()).pipe(
+		defer(() => file(env.PATH_TLS_CA!).text()).pipe(
 			catchError(() => of(""))
+		),
+		defer(() => file(app.decorator.db.filename).exists()).pipe(
+			catchError(() => of(false))
 		)
 	])),
 	take(1)
 )
 .subscribe({
-	next([cert, key, ca]) {
+	next([cert, key, ca, isDbExists]) {
 		console.log("\x1b[32mConnectivity ok!\x1b[0m");
+		if (!isDbExists) {
+			console.error("Database file not found");
+			exit(1);
+		} else {
+			console.log("\x1b[32mDatabase ok!\x1b[0m");
+		}
 		if (env.TZ != "UTC") {
 			console.log("\x1b[33mTime zone is not using UTC. Make sure the UNIX time request has the same time zone as the server\x1b[0m");
 		} else {
