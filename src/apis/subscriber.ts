@@ -224,12 +224,12 @@ function getSubscriber(db: Database, id: string, name: string) {
 
 function deleteSubscriber(db: Database, id: string, name: string) {
 	const q = db.query<{ deleted: "Done" }, [string, string]>("DELETE FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 RETURNING 'Done' AS deleted;");
-	const value = q.get(id, name);
+	const subscriber = q.get(id, name);
 	q.finalize();
-	if (value == null) {
+	if (subscriber == null) {
 		return null;
 	}
-	return value.deleted;
+	return subscriber.deleted;
 };
 
 function genKey() {

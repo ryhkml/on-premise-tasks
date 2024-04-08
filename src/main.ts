@@ -22,13 +22,20 @@ const app = new Elysia()
 		if (ctx.code == "VALIDATION") {
 			ctx.set.status = "Bad Request";
 			return {
-				message: ctx.error.validator.Errors(ctx.error.value).First()
+				message: ctx.error.validator.Errors(ctx.error.value).First().message
 			};
 		}
 		if (ctx.code == "NOT_FOUND") {
-			return {
-				message: "The request did not match any resource"
-			};
+			return new Response(null, {
+				status: 404,
+				headers: {
+					"Permissions-Policy": "camera=(), microphone=(), interest-cohort=()",
+					"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+					"X-Content-Type-Options": "nosniff",
+					"X-Frame-Options": "DENY",
+					"X-XSS-Protection": "1; mode=block"
+				}
+			});
 		}
 		console.error("ERROR HTTP EXCEPTION:", ctx.error.message);
 		return ctx.error;
@@ -65,7 +72,7 @@ connectivity().pipe(
 		if (env.TZ != "UTC") {
 			console.log("\x1b[33mTime zone is not using UTC. Make sure the UNIX time request has the same time zone as the server\x1b[0m");
 		} else {
-			console.log("\x1b[32mTimezone ok!\x1b[0m");
+			console.log("\x1b[32mTime zone ok!\x1b[0m");
 		}
 		if (env.CIPHER_KEY == null || env.CIPHER_KEY.trim() == "") {
 			console.error("Set the value of the CIPHER_KEY environment variable first");
