@@ -203,11 +203,11 @@ function addSubscriber(db: Database, ctx: Omit<SubscriberTable, "id" | "tasksInQ
 	return subscriber.subscriberId;
 };
 
-type SubscriberQuery = Omit<SubscriberTable, "id" | "key">;
+type SubscriberQuery = Omit<SubscriberTable, "key">;
 type SubscriberRes = Omit<SubscriberQuery, "subscriberId" | "subscriberName"> & { id: string, name: string }
 
 function getSubscriber(db: Database, id: string, name: string) {
-	const q = db.query<SubscriberQuery, [string, string]>("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 LIMIT 1;");
+	const q = db.query<SubscriberQuery, [string, string]>("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2;");
 	const subscriber = q.get(id, name);
 	q.finalize();
 	if (subscriber == null) {

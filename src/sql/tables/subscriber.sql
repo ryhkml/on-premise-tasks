@@ -1,6 +1,5 @@
 CREATE TABLE subscriber (
-	id					INTEGER PRIMARY KEY AUTOINCREMENT,
-	subscriberId 		TEXT UNIQUE NOT NULL,
+	subscriberId 		TEXT UNIQUE PRIMARY KEY,
 	subscriberName 		TEXT UNIQUE NOT NULL,
 	key 				TEXT NOT NULL,
 	createdAt 			INTEGER NOT NULL,
@@ -8,6 +7,11 @@ CREATE TABLE subscriber (
 	tasksInQueueLimit 	INTEGER NULL DEFAULT 1000
 );
 
-CREATE UNIQUE INDEX ixSubscriberId ON subscriber(subscriberId);
+CREATE INDEX ixSubscriberIdxNamexTasksInQueue ON subscriber(subscriberId, subscriberName, tasksInQueue);
+CREATE INDEX ixSubscriberIdxTasksInQueuexLimit ON subscriber(subscriberId, tasksInQueue, tasksInQueueLimit);
 
-CREATE UNIQUE INDEX ixSubscriberName ON subscriber(subscriberName);
+CREATE TRIGGER deleteUnusedQueue
+AFTER DELETE ON subscriber
+BEGIN
+	DELETE FROM queue WHERE NOT EXISTS (SELECT 'Done' AS deleted FROM queue WHERE subscriberId = OLD.subscriberId);
+END;

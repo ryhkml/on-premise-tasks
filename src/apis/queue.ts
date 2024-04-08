@@ -418,7 +418,7 @@ export function queue() {
 
 function unsubscribeQueue(db: Database, queueId: string) {
 	const unsubscribeAt = Date.now();
-	const q = db.query<{ unsubscribed: "Done" }, [number, string]>("UPDATE queue SET state = 'DONE', statusCode = 0, estimateEndAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1) RETURNING 'Done' AS unsubscribed;");
+	const q = db.query<{ unsubscribed: "Done" }, [number, string]>("UPDATE queue SET state = 'DONE', statusCode = 0, estimateEndAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber) RETURNING 'Done' AS unsubscribed;");
 	const queue = q.get(unsubscribeAt, queueId);
 	q.finalize();
 	if (queue == null) {
@@ -441,7 +441,7 @@ function resumeQueue(db: Database, queueId: string) {
 
 function pauseQueue(db: Database, queueId: string) {
 	const pauseAt = Date.now();
-	const q = db.query<{ paused: "Done" }, [number, string]>("UPDATE queue SET state = 'PAUSED', estimateEndAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1) RETURNING 'Done' AS paused;");
+	const q = db.query<{ paused: "Done" }, [number, string]>("UPDATE queue SET state = 'PAUSED', estimateEndAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber) RETURNING 'Done' AS paused;");
 	const queue = q.get(pauseAt, queueId);
 	q.finalize();
 	if (queue == null) {
@@ -463,8 +463,8 @@ type SubscriptionContext = {
 
 function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queueId: string, configId: string) {
 	const log = toSafeInteger(env.LOG) == 1;
-	const stmtQ = ctx.db.prepare<void, [string, number, number, string]>("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1);");
-	const stmtC = ctx.db.prepare<Pick<ConfigTable, "retryCount" | "retryLimit">, string>("UPDATE config SET retrying = 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue LIMIT 1) RETURNING retryCount, retryLimit;");
+	const stmtQ = ctx.db.prepare<void, [string, number, number, string]>("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE queueId = ?4 AND subscriberId IN (SELECT subscriberId FROM subscriber);");
+	const stmtC = ctx.db.prepare<Pick<ConfigTable, "retryCount" | "retryLimit">, string>("UPDATE config SET retrying = 1 WHERE configId = ? AND queueId IN (SELECT queueId FROM queue) RETURNING retryCount, retryLimit;");
 	ctx.store.queues.push({
 		id: queueId,
 		subscription: timer(dueTime).pipe(
@@ -518,7 +518,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 								"X-Tasks-Retry-Limit": retryLimit.toString(),
 								"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
 							};
-							ctx.db.run("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE configId = ?3 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+							ctx.db.run("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE configId = ?3 AND queueId IN (SELECT queueId FROM queue);", [
 								encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + configId),
 								estimateNextRetryAt,
 								configId
@@ -589,39 +589,39 @@ function registerQueue(ctx: SubscriptionContext) {
 			ctx.body.config.timeout
 		]);
 		if (ctx.body.config.executeAt) {
-			ctx.db.run("UPDATE config SET executeAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET executeAt = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				ctx.body.config.executeAt,
 				configId
 			]);
 		} else {
-			ctx.db.run("UPDATE config SET executionDelay = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET executionDelay = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				ctx.body.config.executionDelay,
 				configId
 			]);
 		}
 		if (ctx.body.httpRequest.body) {
 			const strBody = JSON.stringify(ctx.body.httpRequest.body);
-			ctx.db.run("UPDATE config SET bodyStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET bodyStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				encr(strBody, key),
 				configId
 			]);
 		}
 		if (ctx.body.httpRequest.query) {
 			const strQuery = JSON.stringify(ctx.body.httpRequest.query);
-			ctx.db.run("UPDATE config SET queryStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET queryStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				encr(strQuery, key),
 				configId
 			]);
 		}
 		if (ctx.body.httpRequest.headers) {
 			const strHeaders = JSON.stringify(ctx.body.httpRequest.headers);
-			ctx.db.run("UPDATE config SET headersStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET headersStringify = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				encr(strHeaders, key),
 				configId
 			]);
 		}
 		if (ctx.body.config.retryAt) {
-			ctx.db.run("UPDATE config SET retry = 1, retryAt = ?1, retryLimit = 1, retryExponential = 0 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET retry = 1, retryAt = ?1, retryLimit = 1, retryExponential = 0 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				ctx.body.config.retryAt,
 				configId
 			]);
@@ -636,7 +636,7 @@ function registerQueue(ctx: SubscriptionContext) {
 			]);
 		}
 		if (ctx.body.config.retryStatusCode.length) {
-			ctx.db.run("UPDATE config SET retryStatusCode = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue LIMIT 1);", [
+			ctx.db.run("UPDATE config SET retryStatusCode = ?1 WHERE configId = ?2 AND queueId IN (SELECT queueId FROM queue);", [
 				JSON.stringify(ctx.body.config.retryStatusCode),
 				configId
 			]);
@@ -652,7 +652,7 @@ function registerQueue(ctx: SubscriptionContext) {
 }
 
 function deleteQueue(db: Database, queueId: string, forceDelete = false) {
-	let raw = "DELETE FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1)";
+	let raw = "DELETE FROM queue WHERE queueId = ?";
 	if (forceDelete) {
 		raw += " RETURNING 'Done' AS deleted;";
 	} else {
@@ -667,11 +667,11 @@ function deleteQueue(db: Database, queueId: string, forceDelete = false) {
 	return queue.deleted;
 }
 
-type QueueQuery = Omit<QueueTable, "id" | "subscriberId">
+type QueueQuery = Omit<QueueTable, "queueId" | "subscriberId">
 type QueueRes = QueueQuery & { id: string }
 
 function getQueue(db: Database, queueId: string) {
-	const q = db.query<QueueQuery, string>("SELECT state, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE queueId = ? AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1) LIMIT 1;");
+	const q = db.query<QueueQuery, string>("SELECT state, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE queueId = ?;");
 	const queue = q.get(queueId);
 	q.finalize();
 	if (queue == null) {
@@ -749,7 +749,7 @@ function transformQueue(db: Database, queue: ResumeQueueQuery, beforeAt: number,
 		? addMilliseconds(transformAt, resumeDueTime).getTime()
 		: resumeDueTime.getTime();
 	if (!terminated) {
-		db.run("UPDATE queue SET state = 'RUNNING', estimateEndAt = 0, estimateExecutionAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1);", [
+		db.run("UPDATE queue SET state = 'RUNNING', estimateEndAt = 0, estimateExecutionAt = ?1 WHERE queueId = ?2 AND subscriberId IN (SELECT subscriberId FROM subscriber);", [
 			estimateExecutionAt,
 			queue.queueId
 		]);
@@ -778,7 +778,7 @@ function resubscribeQueue(db: Database) {
 	if (queueValues == null || queueValues.length == 0) {
 		return null;
 	}
-	const stmt = db.prepare("UPDATE queue SET estimateExecutionAt = @estimateExecutionAt WHERE queueId = @queueId AND subscriberId IN (SELECT subscriberId FROM subscriber LIMIT 1);");
+	const stmt = db.prepare("UPDATE queue SET estimateExecutionAt = @estimateExecutionAt WHERE queueId = @queueId AND subscriberId IN (SELECT subscriberId FROM subscriber);");
 	const updateResubscribeQueue = db.transaction((queues: Array<{ [k: string]: string | number }>) => {
 		for (let i = 0; i < queues.length; i++) {
 			const queue = queues[i];

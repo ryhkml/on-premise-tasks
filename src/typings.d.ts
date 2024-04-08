@@ -5,7 +5,6 @@ declare global {
 	type SafeAny = any;
 
 	type SubscriberTable = {
-		id: string;
 		subscriberId: string;
 		subscriberName: string;
 		createdAt: number;
@@ -47,7 +46,7 @@ declare global {
 	}
 
 	type QueueTable = {
-		id: string;
+		queueId: string;
 		subscriberId: string;
 		state: string;
 		statusCode: number;
@@ -61,7 +60,6 @@ declare global {
 	}
 
 	type ConfigTable = {
-		id: string;
 		configId: string;
 		queueId: string;
 		url: string;

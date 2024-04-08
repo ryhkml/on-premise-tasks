@@ -19,7 +19,7 @@ export function tasksDb() {
 }
 
 export function stmtSubscriberTasksInQueue() {
-	return tasksDb().prepare<{ tasksInQueue: "Ok" }, string>("SELECT 'Ok' AS tasksInQueue FROM subscriber WHERE subscriberId = ? AND tasksInQueue < tasksInQueueLimit LIMIT 1;");
+	return tasksDb().prepare<{ tasksInQueue: "Ok" }, string>("SELECT 'Ok' AS tasksInQueue FROM subscriber WHERE subscriberId = ? AND tasksInQueue < tasksInQueueLimit;");
 }
 
 export function stmtSubscriberRegistered() {
@@ -27,5 +27,5 @@ export function stmtSubscriberRegistered() {
 }
 
 export function stmtSubscriberKey() {
-	return tasksDb().prepare<Pick<SubscriberTable, "key">, string>("SELECT key FROM subscriber WHERE subscriberId = ? LIMIT 1;");
+	return tasksDb().prepare<Pick<SubscriberTable, "key">, string>("SELECT key FROM subscriber WHERE subscriberId = ?;");
 }

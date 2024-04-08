@@ -1,15 +1,17 @@
 CREATE TABLE queue (
-	id 						INTEGER PRIMARY KEY AUTOINCREMENT,
-	queueId 				TEXT UNIQUE NOT NULL,
+	queueId 				TEXT UNIQUE PRIMARY KEY,
 	subscriberId 			TEXT NOT NULL,
 	state 					TEXT NULL DEFAULT 'RUNNING',
 	statusCode 				INTEGER NULL DEFAULT 0,
 	estimateEndAt 			INTEGER NULL DEFAULT 0,
 	estimateExecutionAt 	INTEGER NOT NULL,
-	FOREIGN KEY (subscriberId) REFERENCES subscriber(subscriberId) ON DELETE CASCADE
+	FOREIGN KEY (subscriberId) REFERENCES subscriber(subscriberId)
 );
 
-CREATE UNIQUE INDEX ixQueueId ON queue(queueId);
+CREATE INDEX ixSubscriberId ON queue(subscriberId);
+CREATE INDEX ixState ON queue(state);
+CREATE INDEX ixQueueIdxSubscriberId ON queue(queueId, subscriberId);
+CREATE INDEX ixQueueIdxState ON queue(queueId, state);
 
 CREATE TRIGGER incrementTasksInQueue
 BEFORE INSERT ON queue

@@ -1,7 +1,6 @@
 CREATE TABLE config (
-	id 						INTEGER PRIMARY KEY AUTOINCREMENT,
-	configId 				TEXT UNIQUE NOT NULL,
-	queueId 				TEXT NULL,
+	configId 				TEXT UNIQUE PRIMARY KEY,
+	queueId 				TEXT UNIQUE NOT NULL,
 	url 					TEXT NULL,
 	method 					TEXT NULL,
 	bodyStringify 			TEXT NULL,
@@ -19,10 +18,10 @@ CREATE TABLE config (
 	retryExponential 		INTEGER NULL DEFAULT 1,
 	estimateNextRetryAt 	INTEGER NULL DEFAULT 0,
 	timeout 				INTEGER NULL DEFAULT 30000,
-	FOREIGN KEY (queueId) REFERENCES queue(queueId) ON DELETE CASCADE
+	FOREIGN KEY (queueId) REFERENCES queue(queueId)
 );
 
-CREATE UNIQUE INDEX ixConfigId ON config(configId);
+CREATE INDEX ixConfigIdxQueueId ON config(configId, queueId);
 
 CREATE TRIGGER incrementRetryCount
 BEFORE UPDATE OF retrying ON config
