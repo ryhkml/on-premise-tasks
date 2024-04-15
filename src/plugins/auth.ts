@@ -20,19 +20,14 @@ export function pluginAuth() {
 			};
 		})
 		.onBeforeHandle({ as: "scoped" }, async ctx => {
-			if (ctx.id == "" || ctx.key == "") {
+			const subscriber = ctx.stmtSubscriberKey.get(ctx.id);
+			if (subscriber == null) {
 				return ctx.error("Unauthorized", {
 					message: "The request did not include valid authentication"
 				});
 			}
-			const value = ctx.stmtSubscriberKey.get(ctx.id);
-			if (value == null) {
-				return ctx.error("Unauthorized", {
-					message: "The request did not include valid authentication"
-				});
-			}
-			const isValidKey = await password.verify(ctx.key, value.key, "argon2id");
-			if (!isValidKey) {
+			const isInvalidKey = !(await password.verify(ctx.key, subscriber.key, "argon2id"));
+			if (isInvalidKey) {
 				return ctx.error("Forbidden", {
 					message: "The server did not accept valid authentication"
 				});

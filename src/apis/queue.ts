@@ -20,6 +20,22 @@ export function queue() {
 		.headers({
 			"X-XSS-Protection": "0"
 		})
+		.model({
+			authHeaders: t.Object({
+				"authorization": t.String(),
+				"content-length": t.Optional(t.String()),
+				"x-tasks-subscriber-id": t.String({
+					default: null,
+					pattern: "^[0-9A-HJ-NPR-ZA-KM-Z]{26}$"
+				})
+			}),
+			queueId: t.Object({
+				id: t.String({
+					default: null,
+					pattern: "^[0-9][A-Z0-9]{24}$"
+				})
+			})
+		})
 		.onAfterHandle(ctx => {
 			if (ctx.request.method != "GET") {
 				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
@@ -30,156 +46,6 @@ export function queue() {
 		.use(pluginAuth())
 		.state("queues", [] as Array<QueueSafe>)
 		.decorate("db", tasksDb())
-		.decorate("subject", new BehaviorSubject(null))
-		.guard({
-			headers: t.Object({
-				"authorization": t.String(),
-				"x-tasks-subscriber-id": t.String()
-			}),
-			params: t.Object({
-				id: t.String({
-					default: null
-				})
-			})
-		}, api => api
-			.get("/:id", ctx => {
-				const queue = getQueue(ctx.db, ctx.params.id);
-				if (queue == null) {
-					return ctx.error("Not Found", {
-						message: "The request did not match any resource"
-					});
-				}
-				return queue;
-			}, {
-				response: {
-					200: t.Object({
-						id: t.String(),
-						state: t.String(),
-						statusCode: t.Integer(),
-						estimateEndAt: t.Integer(),
-						estimateExecutionAt: t.Integer()
-					}),
-					404: t.Object({
-						message: t.String()
-					})
-				},
-				type: "json"
-			})
-			.get("/:id/config", ctx => {
-
-			})
-			.patch("/:id/pause", ctx => {
-				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
-				const paused = pauseQueue(ctx.db, ctx.params.id);
-				if (index == -1 || paused == null) {
-					return ctx.error("Unprocessable Content", {
-						message: "The request did not meet one of it's preconditions"
-					});
-				}
-				ctx.store.queues[index].subscription.unsubscribe();
-				return {
-					message: "Done"
-				};
-			}, {
-				response: {
-					200: t.Object({
-						message: t.String()
-					}),
-					422: t.Object({
-						message: t.String()
-					})
-				}
-			})
-			.patch("/:id/resume", ctx => {
-				const resumed = resumeQueue(ctx.db, ctx.params.id);
-				if (resumed == null) {
-					return ctx.error("Unprocessable Content", {
-						message: "The request did not meet one of it's preconditions"
-					});
-				}
-				const subscriptionCtx = {
-					id: ctx.id,
-					db: ctx.db,
-					body: resumed.body,
-					today: ctx.today,
-					store: ctx.store,
-					subject: ctx.subject
-				};
-				pushSubscription(subscriptionCtx, resumed.dueTime, resumed.queueId, resumed.configId);
-				return {
-					message: "Running"
-				};
-			}, {
-				response: {
-					200: t.Object({
-						message: t.String()
-					}),
-					422: t.Object({
-						message: t.String()
-					})
-				}
-			})
-			.patch("/:id/unsubscribe", ctx => {
-				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
-				const unsubscribed = unsubscribeQueue(ctx.db, ctx.params.id);
-				if (index == -1 || unsubscribed == null) {
-					return ctx.error("Bad Request", {
-						message: "A request includes an invalid credential or value"
-					});
-				}
-				ctx.store.queues[index].subscription.unsubscribe();
-				return {
-					message: "Done"
-				};
-			}, {
-				type: "json"
-			})
-			.delete("/:id", ctx => {
-				const deleted = deleteQueue(ctx.db, ctx.params.id, !!ctx.query.force);
-				if (deleted == null) {
-					return ctx.error("Unprocessable Content", {
-						message: "The request did not meet one of it's preconditions"
-					});
-				}
-				if (ctx.query.force) {
-					const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
-					if (index != -1) {
-						ctx.store.queues[index].subscription.unsubscribe();
-						unsubscribeQueue(ctx.db, ctx.params.id);
-					}
-				}
-				return {
-					message: "Done"
-				};
-			}, {
-				transform(ctx) {
-					if ("force" in ctx.query) {
-						ctx.query.force = toSafeInteger(ctx.query.force) as 0 | 1;
-					} else {
-						ctx.query["force"] = 0;
-					}
-				},
-				query: t.Object({
-					force: t.Optional(
-						t.Union([
-							t.Literal(0),
-							t.Literal(1)
-						], {
-							default: 0
-						})
-					)
-				}),
-				response: {
-					200: t.Object({
-						message: t.String()
-					}),
-					422: t.Object({
-						message: t.String()
-					})
-				},
-				type: "json"
-			})
-		)
 		.decorate("defaultConfig", {
 			executionDelay: 1,
 			executeAt: 0,
@@ -190,7 +56,165 @@ export function queue() {
 			retryExponential: true,
 			timeout: 30000
 		})
+		.decorate("subject", new BehaviorSubject(null))
+		// Get queue
+		.get("/:id", ctx => {
+			const queue = getQueue(ctx.db, ctx.params.id);
+			if (queue == null) {
+				return ctx.error("Not Found", {
+					message: "The request did not match any resource"
+				});
+			}
+			return queue;
+		}, {
+			headers: "authHeaders",
+			params: "queueId",
+			response: {
+				200: t.Object({
+					id: t.String(),
+					state: t.String(),
+					statusCode: t.Integer(),
+					estimateEndAt: t.Integer(),
+					estimateExecutionAt: t.Integer()
+				}),
+				404: t.Object({
+					message: t.String()
+				})
+			},
+			type: "json"
+		})
+		// Get queue config
+		.get("/:id/config", ctx => {
+
+		}, {
+			headers: "authHeaders",
+			params: "queueId"
+		})
+		// Pause queue
+		.patch("/:id/pause", ctx => {
+			const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
+			const paused = pauseQueue(ctx.db, ctx.params.id);
+			if (index == -1 || paused == null) {
+				return ctx.error("Unprocessable Content", {
+					message: "The request did not meet one of it's preconditions"
+				});
+			}
+			ctx.store.queues[index].subscription.unsubscribe();
+			return {
+				message: "Done"
+			};
+		}, {
+			headers: "authHeaders",
+			params: "queueId",
+			response: {
+				200: t.Object({
+					message: t.String()
+				}),
+				422: t.Object({
+					message: t.String()
+				})
+			}
+		})
+		// Resume queue
+		.patch("/:id/resume", ctx => {
+			const resumed = resumeQueue(ctx.db, ctx.params.id);
+			if (resumed == null) {
+				return ctx.error("Unprocessable Content", {
+					message: "The request did not meet one of it's preconditions"
+				});
+			}
+			const subscriptionCtx = {
+				id: ctx.id,
+				db: ctx.db,
+				body: resumed.body,
+				today: ctx.today,
+				store: ctx.store,
+				subject: ctx.subject
+			};
+			pushSubscription(subscriptionCtx, resumed.dueTime, resumed.queueId, resumed.configId);
+			return {
+				message: "Running"
+			};
+		}, {
+			headers: "authHeaders",
+			params: "queueId",
+			response: {
+				200: t.Object({
+					message: t.String()
+				}),
+				422: t.Object({
+					message: t.String()
+				})
+			}
+		})
+		// Unsubscribe queue
+		.patch("/:id/unsubscribe", ctx => {
+			const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
+			const unsubscribed = unsubscribeQueue(ctx.db, ctx.params.id);
+			if (index == -1 || unsubscribed == null) {
+				return ctx.error("Bad Request", {
+					message: "A request includes an invalid credential or value"
+				});
+			}
+			ctx.store.queues[index].subscription.unsubscribe();
+			return {
+				message: "Done"
+			};
+		}, {
+			headers: "authHeaders",
+			params: "queueId",
+			type: "json"
+		})
+		// Delete queue
+		.delete("/:id", ctx => {
+			const deleted = deleteQueue(ctx.db, ctx.params.id, !!ctx.query.force);
+			if (deleted == null) {
+				return ctx.error("Unprocessable Content", {
+					message: "The request did not meet one of it's preconditions"
+				});
+			}
+			if (ctx.query.force) {
+				const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
+				if (index != -1) {
+					ctx.store.queues[index].subscription.unsubscribe();
+					unsubscribeQueue(ctx.db, ctx.params.id);
+				}
+			}
+			return {
+				message: "Done"
+			};
+		}, {
+			transform(ctx) {
+				if ("force" in ctx.query) {
+					ctx.query.force = toSafeInteger(ctx.query.force) as 0 | 1;
+				} else {
+					ctx.query["force"] = 0;
+				}
+			},
+			headers: "authHeaders",
+			params: "queueId",
+			query: t.Object({
+				force: t.Optional(
+					t.Union([
+						t.Literal(0),
+						t.Literal(1)
+					], {
+						default: 0
+					})
+				)
+			}),
+			response: {
+				200: t.Object({
+					message: t.String()
+				}),
+				422: t.Object({
+					message: t.String()
+				})
+			},
+			type: "json"
+		})
 		.decorate("stmtSubscriberTasksInQueue", stmtSubscriberTasksInQueue())
+		// Register queue
 		.post("/register", ctx => {
 			ctx.set.status = "Created";
 			return registerQueue(ctx);
@@ -330,10 +354,7 @@ export function queue() {
 					})
 				})
 			}),
-			headers: t.Object({
-				"authorization": t.String(),
-				"x-tasks-subscriber-id": t.String()
-			}),
+			headers: "authHeaders",
 			detail: {
 				tags: ["Queue"],
 				summary: "Register queue",

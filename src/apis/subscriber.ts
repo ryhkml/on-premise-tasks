@@ -15,6 +15,22 @@ export function subscriber() {
 		.headers({
 			"X-XSS-Protection": "0"
 		})
+		.model({
+			authHeaders: t.Object({
+				"authorization": t.String(),
+				"content-length": t.Optional(t.String()),
+				"x-tasks-subscriber-id": t.String({
+					default: null,
+					pattern: "^[0-9A-HJ-NPR-ZA-KM-Z]{26}$"
+				})
+			}),
+			subscriberName: t.Object({
+				name: t.String({
+					default: null,
+					pattern: "^(?![0-9-])(?!.*--)[a-z0-9-]{5,32}(?<!-)$"
+				})
+			})
+		})
 		.onAfterHandle(ctx => {
 			if (ctx.request.method != "GET") {
 				ctx.set.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
@@ -23,110 +39,101 @@ export function subscriber() {
 		})
 		.use(pluginContentLength())
 		.decorate("db", tasksDb())
-		.guard({
-			headers: t.Object({
-				"authorization": t.String(),
-				"x-tasks-subscriber-id": t.String()
-			}),
-			params: t.Object({
-				name: t.String({
-					default: "",
-					minLength: 3,
-					maxLength: 32
-				})
-			})
-		}, api => api
-			.use(pluginAuth())
-			.get("/:name", ctx => {
-				const subscriber = getSubscriber(ctx.db, ctx.id, ctx.params.name);
-				if (subscriber == null) {
-					return ctx.error("Not Found", {
-						message: "Subscriber not found"
-					});
-				}
-				return subscriber;
-			}, {
-				detail: {
-					tags: ["Subscriber"],
-					summary: "Get subscriber",
-					parameters: [
-						{
-							in: "header",
-							name: "authorization",
-							required: true,
-							example: "Bearer <KEY>"
-						},
-						{
-							in: "header",
-							name: "x-tasks-subscriber-id",
-							required: true,
-							example: "<ID>"
-						}
-					]
-				},
-				response: {
-					200: t.Object({
-						id: t.String(),
-						name: t.String(),
-						createdAt: t.Integer({
-							default: 0
+		.guard({ headers: "authHeaders", params: "subscriberName" }, app => {
+			return app
+				.use(pluginAuth())
+				// Get subscriber
+				.get("/:name", ctx => {
+					const subscriber = getSubscriber(ctx.db, ctx.id, ctx.params.name);
+					if (subscriber == null) {
+						return ctx.error("Not Found", {
+							message: "Subscriber not found"
+						});
+					}
+					return subscriber;
+				}, {
+					detail: {
+						tags: ["Subscriber"],
+						summary: "Get subscriber",
+						parameters: [
+							{
+								in: "header",
+								name: "authorization",
+								required: true,
+								example: "Bearer <KEY>"
+							},
+							{
+								in: "header",
+								name: "x-tasks-subscriber-id",
+								required: true,
+								example: "<ID>"
+							}
+						]
+					},
+					response: {
+						200: t.Object({
+							id: t.String(),
+							name: t.String(),
+							createdAt: t.Integer({
+								default: 0
+							}),
+							tasksInQueue: t.Integer({
+								default: 0
+							}),
+							tasksInQueueLimit: t.Integer({
+								default: 1000
+							})
 						}),
-						tasksInQueue: t.Integer({
-							default: 0
-						}),
-						tasksInQueueLimit: t.Integer({
-							default: 1000
+						404: t.Object({
+							message: t.Literal("Subscriber not found")
 						})
-					}),
-					404: t.Object({
-						message: t.Literal("Subscriber not found")
-					})
-				},
-				type: "json"
-			})
-			.delete("/:name", ctx => {
-				const isDeleted = deleteSubscriber(ctx.db, ctx.id, ctx.params.name);
-				if (isDeleted == null) {
-					return ctx.error("Unprocessable Content", {
-						message: "The request did not meet one of it's preconditions"
-					});
-				}
-				ctx.set.status = "OK";
-				return {
-					message: "Done"
-				};
-			}, {
-				detail: {
-					tags: ["Subscriber"],
-					summary: "Delete subscriber",
-					parameters: [
-						{
-							in: "header",
-							name: "authorization",
-							required: true,
-							example: "Bearer <KEY>"
-						},
-						{
-							in: "header",
-							name: "x-tasks-subscriber-id",
-							required: true,
-							example: "<ID>"
-						}
-					]
-				},
-				response: {
-					200: t.Object({
-						message: t.Literal("Done")
-					}),
-					422: t.Object({
-						message: t.String()
-					})
-				},
-				type: "json"
-			})
-		)
+					},
+					type: "json"
+				})
+				// Delete subscriber
+				.delete("/:name", ctx => {
+					const isDeleted = deleteSubscriber(ctx.db, ctx.id, ctx.params.name);
+					if (isDeleted == null) {
+						return ctx.error("Unprocessable Content", {
+							message: "The request did not meet one of it's preconditions"
+						});
+					}
+					ctx.set.status = "OK";
+					return {
+						message: "Done"
+					};
+				}, {
+					detail: {
+						tags: ["Subscriber"],
+						summary: "Delete subscriber",
+						parameters: [
+							{
+								in: "header",
+								name: "authorization",
+								required: true,
+								example: "Bearer <KEY>"
+							},
+							{
+								in: "header",
+								name: "x-tasks-subscriber-id",
+								required: true,
+								example: "<ID>"
+							}
+						]
+					},
+					response: {
+						200: t.Object({
+							message: t.Literal("Done")
+						}),
+						422: t.Object({
+							message: t.String()
+						})
+					},
+					type: "json"
+				});
+		})
 		.decorate("stmtSubscriberRegistered", stmtSubscriberRegistered())
-		.derive({ as: "scoped" }, () => ({
+		.derive({ as: "local" }, () => ({
 			today: Date.now()
 		}))
 		.post("/register", async ctx => {
@@ -166,14 +173,7 @@ export function subscriber() {
 					});
 				}
 			},
-			body: t.Object({
-				name: t.String({
-					default: "",
-					minLength: 5,
-					maxLength: 32,
-					pattern: "^(?![0-9-])(?!.*--)[a-z0-9-]{5,32}(?<!-)$"
-				})
-			}),
+			body: "subscriberName",
 			detail: {
 				tags: ["Subscriber"],
 				summary: "Register subscriber"

@@ -1,4 +1,4 @@
-import { env, password } from "bun";
+import { env, password, sleep } from "bun";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
@@ -20,9 +20,11 @@ describe("Test AUTH", () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
+		await sleep(1);
 	});
-	afterEach(() => {
+	afterEach(async () => {
 		stmtS.run(name);
+		await sleep(1);
 	});
 
 	it("should respond with the Argon2id hash algorithm with a memory cost of 4 and a time cost of 3", async () => {
@@ -33,20 +35,11 @@ describe("Test AUTH", () => {
 		const isValid = await password.verify(key, secret?.key!, "argon2id");
 		expect(isValid).toBe(true);
 	});
-	it("should respond with status code 401 if the subscriber key and subscriber id are empty", async () => {
-		const { status } = await subscriberApi.subscribers({ name }).get({
-			headers: {
-				"authorization": "",
-				"x-tasks-subscriber-id": ""
-			}
-		});
-		expect(status).toBe(401);
-	});
 	it("should respond with status code 401 if the subscriber id is invalid", async () => {
 		const { status } = await subscriberApi.subscribers({ name }).get({
 			headers: {
 				"authorization": "Bearer " + key,
-				"x-tasks-subscriber-id": "dummy"
+				"x-tasks-subscriber-id": "01HVED284EHKPMFTSSXMJYKRWX"
 			}
 		});
 		expect(status).toBe(401);

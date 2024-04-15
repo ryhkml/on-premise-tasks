@@ -1,9 +1,8 @@
-import { env } from "bun";
+import { env, sleep } from "bun";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
 
-import { firstValueFrom, timer } from "rxjs";
 import { toSafeInteger } from "lodash";
 
 import { queue } from "../apis/queue";
@@ -30,12 +29,14 @@ describe("Test CONTENT LENGTH", () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
+		await sleep(1);
 	});
-	afterEach(() => {
+	afterEach(async () => {
 		db.transaction(() => {
 			stmtQ.run(id);
 			stmtS.run(name);
 		})();
+		await sleep(1);
 	});
 
 	it("should successfully register the queue, provided that the request payload does not exceed the maximum limit", async () => {
@@ -52,12 +53,11 @@ describe("Test CONTENT LENGTH", () => {
 		const { data, status } = await queueApi.queues.register.post(payload as TaskSubscriberReq, {
 			headers: {
 				"authorization": "Bearer " + key,
-				// @ts-ignore
 				"content-length": len.toString(),
 				"x-tasks-subscriber-id": id
 			}
 		});
-		await firstValueFrom(timer(100));
+		await sleep(100);
 		expect(status).toBe(201);
 		expect(data?.id).toBeDefined();
 		expect(data?.state).toBeDefined();
@@ -100,7 +100,6 @@ describe("Test CONTENT LENGTH", () => {
 		const { status } = await queueApi.queues.register.post(payload, {
 			headers: {
 				"authorization": "Bearer " + key,
-				// @ts-ignore
 				"content-length": len.toString(),
 				"x-tasks-subscriber-id": id
 			}

@@ -22,7 +22,7 @@ const app = new Elysia()
 		if (ctx.code == "VALIDATION") {
 			ctx.set.status = "Bad Request";
 			return {
-				message: ctx.error.validator.Errors(ctx.error.value).First().message
+				message: "A request includes an invalid credential or value"
 			};
 		}
 		if (ctx.code == "NOT_FOUND") {

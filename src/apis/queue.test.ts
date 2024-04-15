@@ -1,9 +1,8 @@
-import { env } from "bun";
+import { env, sleep } from "bun";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
 
-import { firstValueFrom, timer } from "rxjs";
 import { addMilliseconds } from "date-fns";
 
 import { queue } from "./queue";
@@ -26,12 +25,14 @@ describe("Test API", () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
+		await sleep(1);
 	});
-	afterEach(() => {
+	afterEach(async () => {
 		db.transaction(() => {
 			stmtQ.run(id);
 			stmtS.run(name);
 		})();
+		await sleep(1);
 	});
 
 	describe("GET /queues/:id", () => {
@@ -67,7 +68,7 @@ describe("Test API", () => {
 			expect(queue.data?.estimateEndAt).toBeDefined();
 			expect(queue.data?.estimateExecutionAt).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime + 1000));
+			await sleep(dueTime + 1000);
 		});
 	});
 
@@ -92,7 +93,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime + 1000));
+			await sleep(dueTime + 1000);
 			// ...
 			const q = db.query<Pick<QueueTable, "state" | "statusCode">, string>("SELECT state, statusCode FROM queue WHERE queueId = ?;");
 			const { state, statusCode } = q.get(data?.id!)!;
@@ -119,7 +120,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime * 2));
+			await sleep(dueTime * 2);
 			// ...
 			const q = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE queueId = ?;");
 			const { state } = q.get(data?.id!)!;
@@ -207,7 +208,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for tasks
-			await firstValueFrom(timer(dueTime + 1500));
+			await sleep(dueTime + 1500);
 			// ...
 			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ?;");
 			const value = q.get(data?.id!);
@@ -237,7 +238,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for task
-			await firstValueFrom(timer(dueTime / 2));
+			await sleep(dueTime / 2);
 			// ...
 			const pause = await queueApi.queues({ id: data?.id! }).pause.patch(null, {
 				headers: {
@@ -274,7 +275,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// ...
-			await firstValueFrom(timer(1000));
+			await sleep(1000);
 			// Pause
 			const pause = await queueApi.queues({ id: data?.id! }).pause.patch(null, {
 				headers: {
@@ -288,7 +289,7 @@ describe("Test API", () => {
 			const value1 = q1.get(data?.id!);
 			expect(value1?.state).toBe("PAUSED");
 			// ...
-			await firstValueFrom(timer(1000));
+			await sleep(1000);
 			// Resume
 			const resume = await queueApi.queues({ id: data?.id! }).resume.patch(null, {
 				headers: {
@@ -332,7 +333,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for task
-			await firstValueFrom(timer(dueTime / 2));
+			await sleep(dueTime / 2);
 			// ...
 			const unsubscribe = await queueApi.queues({ id: data?.id! }).unsubscribe.patch(null, {
 				headers: {
@@ -366,7 +367,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime + 1000));
+			await sleep(dueTime + 1000);
 			// ...
 			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
 				headers: {
@@ -403,7 +404,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime / 2));
+			await sleep(dueTime / 2);
 			// ...
 			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
 				headers: {
@@ -440,7 +441,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await firstValueFrom(timer(dueTime / 2));
+			await sleep(dueTime / 2);
 			// ...
 			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
 				headers: {

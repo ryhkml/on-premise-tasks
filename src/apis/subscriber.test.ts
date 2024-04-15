@@ -1,4 +1,4 @@
-import { env } from "bun";
+import { env, sleep } from "bun";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
@@ -20,9 +20,11 @@ describe("Test API", () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
+		await sleep(1);
 	});
-	afterEach(() => {
+	afterEach(async () => {
 		stmtS.run(name);
+		await sleep(1);
 	});
 
 	describe("GET /subscribers/:name", () => {
