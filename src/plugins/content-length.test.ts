@@ -23,7 +23,7 @@ let id = "";
 
 describe("Test CONTENT LENGTH", () => {
 	const stmtQ = db.prepare<void, string>("DELETE FROM queue WHERE subscriberId = ?;");
-	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
+	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE name = ?;");
 
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });

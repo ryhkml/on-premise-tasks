@@ -14,7 +14,7 @@ let key = "";
 let id = "";
 
 describe("Test AUTH", () => {
-	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
+	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE name = ?;");
 
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
@@ -28,7 +28,7 @@ describe("Test AUTH", () => {
 	});
 
 	it("should respond with the Argon2id hash algorithm with a memory cost of 4 and a time cost of 3", async () => {
-		const q = db.query<Pick<SubscriberTable, "key">, string>("SELECT key FROM subscriber WHERE subscriberId = ? LIMIT 1;");
+		const q = db.query<Pick<SubscriberTable, "key">, string>("SELECT key FROM subscriber WHERE id = ?;");
 		const secret = q.get(id);
 		expect(secret?.key).toBeDefined();
 		expect(secret?.key).toMatch(/\$argon2id\$v=19\$m=4,t=3,p=1\$/);

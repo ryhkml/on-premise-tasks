@@ -5,8 +5,8 @@ declare global {
 	type SafeAny = any;
 
 	type SubscriberTable = {
-		subscriberId: string;
-		subscriberName: string;
+		id: string;
+		name: string;
 		createdAt: number;
 		key: string;
 		tasksInQueue: number;
@@ -46,7 +46,7 @@ declare global {
 	}
 
 	type QueueTable = {
-		queueId: string;
+		id: string;
 		subscriberId: string;
 		state: string;
 		statusCode: number;
@@ -60,12 +60,40 @@ declare global {
 	}
 
 	type ConfigTable = {
-		configId: string;
+		id: string;
 		queueId: string;
+		/**
+		 * ATTENTION
+		 *
+		 * `url` property must be decrypted first to become readable plain url
+		 *
+		 * @example decr(url, env.CHIPER_KEY)
+		*/
 		url: string;
 		method: Method;
+		/**
+		 * ATTENTION
+		 *
+		 * `bodyStringify` property must be decrypted first and then parsed into an object
+		 *
+		 * @example JSON.parse(decr(bodyStringify, env.CHIPER_KEY))
+		*/
 		bodyStringify: string | null;
+		/**
+		 * ATTENTION
+		 *
+		 * `queryStringify` property must be decrypted first and then parsed into an object
+		 *
+		 * @example JSON.parse(decr(queryStringify, env.CHIPER_KEY))
+		*/
 		queryStringify: string | null;
+		/**
+		 * ATTENTION
+		 *
+		 * `headersStringify` property must be decrypted first and then parsed into an object
+		 *
+		 * @example JSON.parse(decr(headersStringify, env.CHIPER_KEY))
+		*/
 		headersStringify: string | null;
 		executionDelay: number;
 		executeAt: number;
@@ -76,7 +104,11 @@ declare global {
 		retryLimit: number;
 		retryInterval: number;
 		/**
-		 * Parse => number[]
+		 * ATTENTION
+		 *
+		 * `retryStatusCode` property must be parsed first to be an array number data type
+		 *
+		 * @example JSON.parse(retryStatusCode)
 		*/
 		retryStatusCode: string;
 		retryExponential: number;

@@ -1,17 +1,17 @@
 CREATE TABLE subscriber (
-	subscriberId 		TEXT UNIQUE PRIMARY KEY,
-	subscriberName 		TEXT UNIQUE NOT NULL,
-	key 				TEXT NOT NULL,
-	createdAt 			INTEGER NOT NULL,
-	tasksInQueue 		INTEGER NULL DEFAULT 0,
-	tasksInQueueLimit 	INTEGER NULL DEFAULT 1000
+	id					TEXT UNIQUE PRIMARY KEY,
+	key					TEXT NOT NULL,
+	name				TEXT UNIQUE NOT NULL,
+	createdAt			INTEGER NOT NULL,
+	tasksInQueue		INTEGER NULL DEFAULT 0,
+	tasksInQueueLimit	INTEGER NULL DEFAULT 1000
 );
 
-CREATE INDEX ixSubscriberIdxNamexTasksInQueue ON subscriber(subscriberId, subscriberName, tasksInQueue);
-CREATE INDEX ixSubscriberIdxTasksInQueuexLimit ON subscriber(subscriberId, tasksInQueue, tasksInQueueLimit);
+CREATE INDEX idxIdNameTasksInQueue ON subscriber(id, name, tasksInQueue);
+CREATE INDEX idxIdTasksInQueueLimit ON subscriber(id, tasksInQueue, tasksInQueueLimit);
 
 CREATE TRIGGER deleteUnusedQueue
 AFTER DELETE ON subscriber
 BEGIN
-	DELETE FROM queue WHERE NOT EXISTS (SELECT 'Done' AS deleted FROM queue WHERE subscriberId = OLD.subscriberId);
+	DELETE FROM queue WHERE NOT EXISTS (SELECT 'Done' AS deleted FROM queue WHERE id = OLD.id);
 END;

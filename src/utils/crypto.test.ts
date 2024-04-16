@@ -1,8 +1,12 @@
+import { env } from "bun";
 import { describe, expect, it } from "bun:test";
 
 import { decr, encr } from "./crypto";
 
 describe("Test CRYPTO", () => {
+	it("should the env \"CHIPER_KEY\" to be defined", () => {
+		expect(env.CIPHER_KEY).toBeDefined();
+	});
 	it("should encrypt the message", () => {
 		const key = Date.now().toString();
 		const message = "Hello world";

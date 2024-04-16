@@ -19,7 +19,7 @@ let id = "";
 
 describe("Test API", () => {
 	const stmtQ = db.prepare<void, string>("DELETE FROM queue WHERE subscriberId = ?;");
-	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
+	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE name = ?;");
 
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
@@ -95,7 +95,7 @@ describe("Test API", () => {
 			// Waiting for task
 			await sleep(dueTime + 1000);
 			// ...
-			const q = db.query<Pick<QueueTable, "state" | "statusCode">, string>("SELECT state, statusCode FROM queue WHERE queueId = ?;");
+			const q = db.query<Pick<QueueTable, "state" | "statusCode">, string>("SELECT state, statusCode FROM queue WHERE id = ?;");
 			const { state, statusCode } = q.get(data?.id!)!;
 			expect(state).toBe("DONE");
 			expect(statusCode).toBe(200);
@@ -122,7 +122,7 @@ describe("Test API", () => {
 			// Waiting for task
 			await sleep(dueTime * 2);
 			// ...
-			const q = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE queueId = ?;");
+			const q = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE id = ?;");
 			const { state } = q.get(data?.id!)!;
 			expect(state).toBe("ERROR");
 		});
@@ -166,7 +166,7 @@ describe("Test API", () => {
 			expect(status).toBe(400);
 		});
 		it("should respond with status code 429 if the number of tasks in queue is greater than the task in queue limit", async () => {
-			db.run("UPDATE subscriber SET tasksInQueue = 1000 WHERE subscriberName = ?;", [name]);
+			db.run("UPDATE subscriber SET tasksInQueue = 1000 WHERE name = ?;", [name]);
 			const dueTime = 3000;
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
@@ -210,7 +210,7 @@ describe("Test API", () => {
 			// Wait for tasks
 			await sleep(dueTime + 1500);
 			// ...
-			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.queueId = c.queueId WHERE q.queueId = ?;");
+			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.id = c.queueId WHERE q.id = ?;");
 			const value = q.get(data?.id!);
 			expect(value?.state).toBe("ERROR");
 			expect(value?.retryCount).toBe(3);
@@ -248,7 +248,7 @@ describe("Test API", () => {
 			});
 			expect(pause.status).toBe(200);
 			expect(pause.data?.message).toBeDefined();
-			const q = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE queueId = ?;");
+			const q = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE id = ?;");
 			const value = q.get(data?.id!);
 			expect(value?.state).toBe("PAUSED");
 		});
@@ -285,7 +285,7 @@ describe("Test API", () => {
 			});
 			expect(pause.status).toBe(200);
 			expect(pause.data?.message).toBeDefined();
-			const q1 = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE queueId = ?;");
+			const q1 = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE id = ?;");
 			const value1 = q1.get(data?.id!);
 			expect(value1?.state).toBe("PAUSED");
 			// ...
@@ -299,7 +299,7 @@ describe("Test API", () => {
 			});
 			expect(resume.status).toBe(200);
 			expect(resume.data?.message).toBeDefined();
-			const q2 = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE queueId = ?;");
+			const q2 = db.query<Pick<QueueTable, "state">, string>("SELECT state FROM queue WHERE id = ?;");
 			const value2 = q2.get(data?.id!);
 			expect(value2?.state).toBe("RUNNING");
 			// Unsubscribe
@@ -380,7 +380,7 @@ describe("Test API", () => {
 			});
 			expect(deleted.status).toBe(200);
 			expect(deleted.data?.message).toBeDefined();
-			const q = db.query<QueueTable, string>("SELECT * FROM queue WHERE queueId = ?;");
+			const q = db.query<QueueTable, string>("SELECT * FROM queue WHERE id = ?;");
 			const queue = q.get(data?.id!);
 			expect(queue).toBe(null);
 		});
@@ -417,7 +417,7 @@ describe("Test API", () => {
 			});
 			expect(deleted.status).toBe(200);
 			expect(deleted.data?.message).toBeDefined();
-			const q = db.query<QueueTable, string>("SELECT * FROM queue WHERE queueId = ?;");
+			const q = db.query<QueueTable, string>("SELECT * FROM queue WHERE id = ?;");
 			const queue = q.get(data?.id!);
 			expect(queue).toBe(null);
 		});

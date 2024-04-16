@@ -146,10 +146,10 @@ export function subscriber() {
 				timeCost: 3
 			});
 			const subscriber = addSubscriber(ctx.db, {
-				subscriberId: id,
-				subscriberName: ctx.body.name,
-				createdAt: ctx.today,
-				key: secretKey
+				id,
+				key: secretKey,
+				name: ctx.body.name,
+				createdAt: ctx.today
 			});
 			if (subscriber == null) {
 				return ctx.error("Internal Server Error", {
@@ -193,37 +193,30 @@ export function subscriber() {
 		});
 }
 
-function addSubscriber(db: Database, ctx: Omit<SubscriberTable, "id" | "tasksInQueue" | "tasksInQueueLimit">) {
-	const q = db.query<{ subscriberId: string }, [string, string, number, string]>("INSERT INTO subscriber (subscriberId, subscriberName, createdAt, key) VALUES (?1, ?2, ?3, ?4) RETURNING subscriberId;");
-	const subscriber = q.get(ctx.subscriberId, ctx.subscriberName, ctx.createdAt, ctx.key);
+function addSubscriber(db: Database, ctx: Omit<SubscriberTable, "tasksInQueue" | "tasksInQueueLimit">) {
+	const q = db.query<{ id: string }, [string, string, string, number]>("INSERT INTO subscriber (id, key, name, createdAt) VALUES (?1, ?2, ?3, ?4) RETURNING id;");
+	const subscriber = q.get(ctx.id, ctx.key, ctx.name, ctx.createdAt);
 	q.finalize();
 	if (subscriber == null) {
 		return null;
 	}
-	return subscriber.subscriberId;
+	return subscriber.id;
 };
 
 type SubscriberQuery = Omit<SubscriberTable, "key">;
-type SubscriberRes = Omit<SubscriberQuery, "subscriberId" | "subscriberName"> & { id: string, name: string }
 
 function getSubscriber(db: Database, id: string, name: string) {
-	const q = db.query<SubscriberQuery, [string, string]>("SELECT subscriberId, subscriberName, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2;");
+	const q = db.query<SubscriberQuery, [string, string]>("SELECT id, name, createdAt, tasksInQueue, tasksInQueueLimit FROM subscriber WHERE id = ?1 AND name = ?2;");
 	const subscriber = q.get(id, name);
 	q.finalize();
 	if (subscriber == null) {
 		return null;
 	}
-	return {
-		id: subscriber.subscriberId,
-		name: subscriber.subscriberName,
-		createdAt: subscriber.createdAt,
-		tasksInQueue: subscriber.tasksInQueue,
-		tasksInQueueLimit: subscriber.tasksInQueueLimit
-	} as SubscriberRes;
+	return subscriber;
 };
 
 function deleteSubscriber(db: Database, id: string, name: string) {
-	const q = db.query<{ deleted: "Done" }, [string, string]>("DELETE FROM subscriber WHERE subscriberId = ?1 AND subscriberName = ?2 AND tasksInQueue = 0 RETURNING 'Done' AS deleted;");
+	const q = db.query<{ deleted: "Done" }, [string, string]>("DELETE FROM subscriber WHERE id = ?1 AND name = ?2 AND tasksInQueue = 0 RETURNING 'Done' AS deleted;");
 	const subscriber = q.get(id, name);
 	q.finalize();
 	if (subscriber == null) {

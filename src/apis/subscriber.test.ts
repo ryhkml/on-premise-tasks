@@ -14,7 +14,7 @@ let key = "";
 let id = "";
 
 describe("Test API", () => {
-	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE subscriberName = ?;");
+	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE name = ?;");
 
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
@@ -56,7 +56,7 @@ describe("Test API", () => {
 	describe("POST /subscribers/register", () => {
 		it("should the subscriber not be registered", () => {
 			stmtS.run(name);
-			const q = db.query<{ isRegistered: 0 | 1 }, string>("SELECT EXISTS (SELECT 1 FROM subscriber WHERE subscriberName = ?) AS isRegistered;");
+			const q = db.query<{ isRegistered: 0 | 1 }, string>("SELECT EXISTS (SELECT 1 FROM subscriber WHERE name = ?) AS isRegistered;");
 			const subscriber = q.get(name)!;
 			const notExists = !!subscriber.isRegistered;
 			expect(notExists).toBe(false);
@@ -86,7 +86,7 @@ describe("Test API", () => {
 			expect(data?.message).toBeDefined();
 		});
 		it("should respond with status code 422 if the number of subscriber tasks in queue is greater than or equal to 1", async () => {
-			db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE subscriberName = ?;", [name]);
+			db.run("UPDATE subscriber SET tasksInQueue = tasksInQueue + 1 WHERE name = ?;", [name]);
 			const { status } = await subscriberApi.subscribers({ name }).delete(null, {
 				headers: {
 					"authorization": "Bearer " + key,

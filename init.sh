@@ -79,7 +79,4 @@ echo ".env.development file has been created"
 echo ".env.production file has been created"
 
 bun install
-bun run reinit:testdb
 bun run test
-
-echo "On-Premise Tasks is ready to serve"
