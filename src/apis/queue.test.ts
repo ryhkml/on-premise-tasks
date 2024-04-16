@@ -1,9 +1,7 @@
 import { env, sleep } from "bun";
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, setSystemTime } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
-
-import { addMilliseconds } from "date-fns";
 
 import { queue } from "./queue";
 import { subscriber } from "./subscriber";
@@ -127,6 +125,12 @@ describe("Test API", () => {
 			expect(state).toBe("ERROR");
 		});
 		it("should respond with status code 400 if the execution time is earlier than the current time.", async () => {
+			// It was 2012 for a moment.. 💀
+			setSystemTime(new Date("2012-12-12"));
+			const executeAt = new Date().getTime();
+			expect(new Date().getFullYear()).toBe(2012);
+			// Reset
+			setSystemTime();
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
@@ -134,7 +138,7 @@ describe("Test API", () => {
 				},
 				config: {
 					...queueApp.decorator.defaultConfig,
-					executeAt: Date.now() - 666
+					executeAt
 				}
 			}, {
 				headers: {
@@ -145,8 +149,13 @@ describe("Test API", () => {
 			expect(status).toBe(400);
 		});
 		it("should respond with status code 400 if the \"retryAt\" execution time is earlier than the execution time", async () => {
+			// It was 2012 for a moment.. 💀
+			setSystemTime(new Date("2012-12-12"));
 			const dueTime = 3000;
-			const estimateExecutionTime = addMilliseconds(Date.now(), dueTime).getTime();
+			const retryAt = new Date().getTime() + dueTime;
+			expect(new Date().getFullYear()).toBe(2012);
+			// Reset
+			setSystemTime();
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
 					url: "https://www.starlink.com",
@@ -155,7 +164,7 @@ describe("Test API", () => {
 				config: {
 					...queueApp.decorator.defaultConfig,
 					executionDelay: dueTime,
-					retryAt: estimateExecutionTime - 666
+					retryAt
 				}
 			}, {
 				headers: {
