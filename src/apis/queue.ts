@@ -4,9 +4,10 @@ import { Database } from "bun:sqlite";
 import { randomBytes } from "node:crypto";
 
 import { Elysia, t } from "elysia";
+import { cron, Patterns } from "@elysiajs/cron";
 
 import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
-import { BehaviorSubject, TimeoutError, catchError, defer, delay, filter, finalize, interval, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
+import { BehaviorSubject, TimeoutError, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
 import { defer as deferLd, kebabCase, toSafeInteger, toString } from "lodash";
 
 import { fetchHttp } from "../utils/fetch";
@@ -399,6 +400,18 @@ export function queue() {
 			type: "json"
 		})
 		.onStart(ctx => {
+			const trackLastRecord = () => {
+				const stmt = ctx.decorator.db.prepare("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
+				ctx.use(cron({
+					name: "stmtLastRecord",
+					pattern: Patterns.EVERY_SECOND,
+					protect: true,
+					timezone: env.TZ,
+					run() {
+						stmt.run();
+					}
+				}));
+			};
 			ctx.decorator.subject.pipe(
 				filter(() => !!ctx.store.queues.length),
 				delay(1),
@@ -415,7 +428,7 @@ export function queue() {
 			deferLd(() => {
 				let resubscribes = resubscribeQueue(ctx.decorator.db);
 				if (resubscribes == null || resubscribes.length == 0) {
-					trackLastRecord(ctx.decorator.db);
+					trackLastRecord();
 				} else {
 					for (let i = 0; i < resubscribes.length; i++) {
 						const item = resubscribes[i];
@@ -431,7 +444,7 @@ export function queue() {
 					}
 					console.log("Resubscribe queues done", resubscribes.length);
 					resubscribes = null;
-					trackLastRecord(ctx.decorator.db);
+					trackLastRecord();
 				}
 			});
 		});
@@ -819,15 +832,6 @@ function resubscribeQueue(db: Database) {
 	);
 	stmt.finalize();
 	return resubscribes;
-}
-
-function trackLastRecord(db: Database) {
-	const stmt = db.prepare("UPDATE timeframe SET lastRecordAt = lastRecordAt;");
-	interval(1000).subscribe({
-		next() {
-			stmt.run();
-		}
-	});
 }
 
 function genKey(configId: string) {

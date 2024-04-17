@@ -17,9 +17,10 @@ async function initDb() {
 		await sleep(delay / 2);
 		const db = new Database(env.PATH_SQLITE);
 		db.run("PRAGMA journal_mode = WAL;");
-		db.run("PRAGMA synchronous = NORMAL;");
+		db.run("PRAGMA synchronous = OFF;");
 		db.run("PRAGMA foreign_keys = ON;");
 		db.run("PRAGMA journal_size_limit = 1048576;");
+		db.run("PRAGMA page_size = 32768;");
 		const [t1, t2, t3, t4] = await Promise.all([
 			file("./src/sql/tables/subscriber.sql").text(),
 			file("./src/sql/tables/queue.sql").text(),

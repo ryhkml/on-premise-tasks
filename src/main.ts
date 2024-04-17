@@ -3,12 +3,14 @@ import { env, file } from "bun";
 import { exit } from "node:process";
 
 import { Elysia } from "elysia";
+import { cron, Patterns } from "@elysiajs/cron";
 import { catchError, defer, forkJoin, of, switchMap, take } from "rxjs";
 import { toSafeInteger } from "lodash";
 
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
 import { connectivity } from "./utils/connectivity";
+import { backupDb } from "./utils/backup";
 
 const app = new Elysia()
 	.headers({
@@ -78,6 +80,25 @@ connectivity().pipe(
 			console.error("Set the value of the CIPHER_KEY environment variable first");
 			exit(1);
 		}
+		// App
+		app.use(cron({
+			name: "pragmaOptimize",
+			pattern: Patterns.EVERY_HOUR,
+			protect: true,
+			timezone: env.TZ,
+			run() {
+				app.decorator.db.run("PRAGMA optimize;");
+			}
+		}));
+		app.use(cron({
+			name: "backupDatabase",
+			pattern: env.BACKUP_CRON_PATTERN_SQLITE || Patterns.EVERY_DAY_AT_MIDNIGHT,
+			protect: true,
+			timezone: env.BACKUP_CRON_TZ_SQLITE || env.TZ,
+			run() {
+				backupDb();
+			}
+		}));
 		app.listen({
 			maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST) || 32768,
 			port: toSafeInteger(env.PORT) || 3200,
