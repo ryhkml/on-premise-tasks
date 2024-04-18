@@ -35,6 +35,27 @@ BACKUP_CRON_PATTERN_SQLITE=
 # Timezone cron job
 # Default: reference to env TZ
 BACKUP_CRON_TZ_SQLITE=
+#
+# The backup method uses Google Cloud Storage
+#
+# Google Cloud project ID
+# Visit: https://support.google.com/googleapi/answer/7014113
+BACKUP_GCS_PROJECT_ID_SQLITE=
+#
+# Before getting the private key, client id, and client email create a service account first
+#
+# Visit: https://cloud.google.com/iam/docs/service-accounts-create
+# Private key
+BACKUP_GCS_PRIVATE_KEY_SQLITE=
+# Client ID
+BACKUP_GCS_CLIENT_ID_SQLITE=
+# Client Email
+BACKUP_GCS_CLIENT_EMAIL_SQLITE=
+# Bucket name
+# Visit: https://cloud.google.com/storage/docs/buckets#naming
+BACKUP_BUCKET_NAME_SQLITE=
+# Bucket directory
+BACKUP_BUCKET_DIR_SQLITE=
 
 # The cipher key to encrypt sensitive data before it enters the database.
 # Make sure to use a random character value.
@@ -84,6 +105,27 @@ BACKUP_CRON_PATTERN_SQLITE=
 # Timezone cron job
 # Default: reference to env TZ
 BACKUP_CRON_TZ_SQLITE=
+#
+# The backup method uses Google Cloud Storage
+#
+# Google Cloud project ID
+# Visit: https://support.google.com/googleapi/answer/7014113
+BACKUP_GCS_PROJECT_ID_SQLITE=
+#
+# Before getting the private key, client id, and client email create a service account first
+#
+# Visit: https://cloud.google.com/iam/docs/service-accounts-create
+# Private key
+BACKUP_GCS_PRIVATE_KEY_SQLITE=
+# Client ID
+BACKUP_GCS_CLIENT_ID_SQLITE=
+# Client Email
+BACKUP_GCS_CLIENT_EMAIL_SQLITE=
+# Bucket name
+# Visit: https://cloud.google.com/storage/docs/buckets#naming
+BACKUP_BUCKET_NAME_SQLITE=
+# Bucket directory
+BACKUP_BUCKET_DIR_SQLITE=
 
 # The cipher key to encrypt sensitive data before it enters the database.
 # Make sure to use a random character value.
