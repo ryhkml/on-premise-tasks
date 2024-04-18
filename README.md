@@ -173,15 +173,15 @@ Please note that properties ending with `"At"` are in UNIX time format:
 
 To find out milliseconds in various programming languages, you can visit https://currentmillis.com and remember to set the environment variable `TZ=UTC` on the Tasks Server.
 
-## SQLite Database Backup
+## SQLite Backup
 
 There are two backup methods:
 1. Local. The local method copies the database file, then moves it to another directory. This method is active by default
-2. Google Cloud Storage. The Google Cloud Storage method uploads database files to a Google Cloud Storage bucket.
+2. Google Cloud Storage. The Google Cloud Storage method uploads database files to a Google Cloud Storage.
 
 You can set it via env variable
 ```ts
-type BackupMethodSqlite = "LOCAL" | "GOOGLE_CLOUD_STORAGE"
+type SqliteBackupMethod = "LOCAL" | "GOOGLE_CLOUD_STORAGE"
 ```
 ```sh
 BACKUP_METHOD_SQLITE="LOCAL"
@@ -193,10 +193,10 @@ You can also set the backup interval using the cron format
 BACKUP_CRON_PATTERN_SQLITE=
 ```
 
-### How to use the Google Cloud Storage backup method
+### Set up authentication for Google Cloud Storage
 
-1. Create a service account first and do not grant any access, just create! [For more information visit](https://cloud.google.com/iam/docs/service-accounts-create#creating)
-2. Create a service account key. (select the JSON format) [For more information visit](https://cloud.google.com/iam/docs/keys-create-delete#creating)
+1. Create a service account and do not grant any access, just create! [For more information visit](https://cloud.google.com/iam/docs/service-accounts-create#creating)
+2. Create a new key (select the JSON format) [For more information visit](https://cloud.google.com/iam/docs/keys-create-delete#creating)
 3. Go to Google Cloud Storage, create a bucket
 4. Click the three-dot icon in the corner of the bucket table to perform more actions, then click edit access
 5. Click add principal

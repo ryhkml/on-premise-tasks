@@ -2,7 +2,7 @@ import { env, file, write } from "bun";
 
 import { Storage } from "@google-cloud/storage";
 
-export async function backupDb(method: string) {
+export async function backupDb(method: SqliteBackupMethod) {
 	if (method == "LOCAL") {
 		try {
 			const db = file(env.PATH_SQLITE!);

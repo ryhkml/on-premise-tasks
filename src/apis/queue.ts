@@ -228,7 +228,7 @@ export function queue() {
 				if (ctx.body.httpRequest.body && (ctx.body.httpRequest.method == "GET" || ctx.body.httpRequest.method == "DELETE")) {
 					ctx.body.httpRequest.body = undefined;
 				}
-				ctx.body.httpRequest.method = ctx.body.httpRequest.method.toUpperCase() as Method;
+				ctx.body.httpRequest.method = ctx.body.httpRequest.method.toUpperCase() as HttpMethod;
 				if (ctx.body.config.executeAt) {
 					ctx.body.config.executionDelay = 0;
 				} else {

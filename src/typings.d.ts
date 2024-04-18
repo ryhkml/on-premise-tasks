@@ -13,11 +13,11 @@ declare global {
 		tasksInQueueLimit: number;
 	}
 
-	type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+	type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 	type TaskHttp = {
 		url: string;
-		method: Method;
+		method: HttpMethod;
 		body?: {
 			[key: string]: string;
 		};
@@ -70,7 +70,7 @@ declare global {
 		 * @example decr(url, env.CHIPER_KEY)
 		*/
 		url: string;
-		method: Method;
+		method: HttpMethod;
 		/**
 		 * ATTENTION
 		 *
@@ -115,4 +115,6 @@ declare global {
 		estimateNextRetryAt: number;
 		timeout: number;
 	}
+
+	type SqliteBackupMethod = "LOCAL" | "GOOGLE_CLOUD_STORAGE";
 }

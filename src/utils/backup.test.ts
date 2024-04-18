@@ -7,10 +7,11 @@ import { backupDb } from "./backup";
 import { isBefore } from "date-fns";
 import { Storage } from "@google-cloud/storage";
 
-describe("Test DATABASE BACKUP", () => {
-	describe("Backup method", () => {
+describe("Test BACKUP", () => {
+	describe("SQLite backup method", () => {
 		it("should the env \"BACKUP_METHOD_SQLITE\" to be defined", () => {
-			expect(env.BACKUP_DIR_SQLITE).toBeDefined();
+			expect(env.BACKUP_METHOD_SQLITE).toBeDefined();
+			expect(env.BACKUP_METHOD_SQLITE).toMatch(/(LOCAL|GOOGLE_CLOUD_STORAGE)/i);
 		});
 	});
 
@@ -18,10 +19,6 @@ describe("Test DATABASE BACKUP", () => {
 		describe("Local method", () => {
 			beforeAll(async () => {
 				await backupDb("LOCAL");
-				await sleep(1);
-			});
-			afterAll(async () => {
-				await $`rm -rf ${env.BACKUP_DIR_SQLITE}`;
 				await sleep(1);
 			});
 
@@ -88,16 +85,18 @@ describe("Test DATABASE BACKUP", () => {
 	}
 
 	describe("Restore mechanism", () => {
-		beforeAll(async () => {
-			await backupDb("LOCAL");
-			await sleep(1);
-		});
+		if (env.BACKUP_METHOD_SQLITE == "GOOGLE_CLOUD_STORAGE") {
+			beforeAll(async () => {
+				await backupDb("LOCAL");
+				await sleep(1);
+			});
+		}
 		afterAll(async () => {
 			await $`rm -rf ${env.BACKUP_DIR_SQLITE}`;
 			await sleep(1);
 		});
 
-		it("should successfully restore the database file", async () => {
+		it("should successfully restore the database file", () => {
 			const path = env.BACKUP_DIR_SQLITE + "/bak.tasks.db";
 			const db = new Database(path);
 			expect(db.filename).toBe(path);
