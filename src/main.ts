@@ -96,7 +96,7 @@ connectivity().pipe(
 			protect: true,
 			timezone: env.BACKUP_CRON_TZ_SQLITE || env.TZ,
 			run() {
-				backupDb(env.BACKUP_METHOD_SQLITE!);
+				backupDb(env.BACKUP_METHOD_SQLITE as SqliteBackupMethod);
 			}
 		}));
 		app.listen({

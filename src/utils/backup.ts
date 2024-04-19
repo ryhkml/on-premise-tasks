@@ -1,4 +1,7 @@
-import { env, file, write } from "bun";
+import { Glob, env, file, write } from "bun";
+
+import { createReadStream } from "node:fs";
+import { basename } from "node:path";
 
 import { Storage } from "@google-cloud/storage";
 
@@ -6,19 +9,21 @@ export async function backupDb(method: SqliteBackupMethod) {
 	if (method == "LOCAL") {
 		try {
 			const db = file(env.PATH_SQLITE!);
-			const isExistsDb = await db.exists();
 			const dbShm = file(env.PATH_SQLITE! + "-shm");
-			const isExistsDbShm = await dbShm.exists();
 			const dbWal = file(env.PATH_SQLITE! + "-wal");
-			const isExistsDbWal = await dbWal.exists();
+			const [isExistsDb, isExistsDbShm, isExistsDbWal] = await Promise.all([
+				db.exists(),
+				dbShm.exists(),
+				dbWal.exists()
+			]);
 			if (isExistsDb) {
-				await write(env.BACKUP_DIR_SQLITE! + "/bak.tasks.db", db);
+				await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!), db);
 			}
 			if (isExistsDbShm) {
-				await write(env.BACKUP_DIR_SQLITE! + "/bak.tasks.db-shm", dbShm);
+				await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!) + "-shm", dbShm);
 			}
 			if (isExistsDbWal) {
-				await write(env.BACKUP_DIR_SQLITE! + "/bak.tasks.db-wal", dbWal);
+				await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!) + "-wal", dbWal);
 			}
 		} catch (e) {
 			console.error("Backup DB", String(e));
@@ -26,6 +31,7 @@ export async function backupDb(method: SqliteBackupMethod) {
 	}
 	if (method == "GOOGLE_CLOUD_STORAGE") {
 		try {
+			const paths = [] as Array<string>;
 			const storage = new Storage({
 				projectId: env.BACKUP_GCS_PROJECT_ID_SQLITE,
 				credentials: {
@@ -36,39 +42,40 @@ export async function backupDb(method: SqliteBackupMethod) {
 				},
 				timeout: 30000
 			});
-			const bucket = storage.bucket(env.BACKUP_BUCKET_NAME_SQLITE!);
-			// Db
-			const isExistsDb = await file(env.PATH_SQLITE!).exists();
+			const [isExistsDb, isExistsDbShm, isExistsDbWal] = await Promise.all([
+				file(env.PATH_SQLITE!).exists(),
+				file(env.PATH_SQLITE! + "-shm").exists(),
+				file(env.PATH_SQLITE! + "-wal").exists()
+			]);
 			if (isExistsDb) {
-				await bucket.upload(env.PATH_SQLITE!, {
-					destination: env.BACKUP_BUCKET_DIR_SQLITE + "/bak.tasks.db",
-					metadata: {
-						contentType: "application/vnd.sqlite3; charset=binary"
-					}
-				});
+				paths.push(env.PATH_SQLITE!);
 			}
-			// Db shm
-			const isExistsDbShm = await file(env.PATH_SQLITE! + "-shm").exists();
 			if (isExistsDbShm) {
-				await bucket.upload(env.PATH_SQLITE! + "-shm", {
-					destination: env.BACKUP_BUCKET_DIR_SQLITE + "/bak.tasks.db-shm",
-					metadata: {
-						contentType: "application/octet-stream; charset=binary"
-					}
-				});
+				paths.push(env.PATH_SQLITE! + "-shm");
 			}
-			// Db wal
-			const isExistsDbWal = await file(env.PATH_SQLITE! + "-wal").exists();
 			if (isExistsDbWal) {
-				await bucket.upload(env.PATH_SQLITE! + "-wal", {
-					destination: env.BACKUP_BUCKET_DIR_SQLITE + "/bak.tasks.db-wal",
+				paths.push(env.PATH_SQLITE! + "-wal");
+			}
+			for (let i = 0; i < paths.length; i++) {
+				const path = paths[i];
+				const globDb = new Glob("*.db");
+				const filename = "bak." + basename(path);
+				const writable = storage.bucket(env.BACKUP_BUCKET_NAME_SQLITE!).file(env.BACKUP_BUCKET_DIR_SQLITE + "/" + filename).createWriteStream({
 					metadata: {
-						contentType: "application/octet-stream; charset=binary"
+						contentType: globDb.match(filename)
+							? "application/vnd.sqlite3; charset=binary"
+							: "application/octet-stream; charset=binary"
 					}
 				});
+				const readable = createReadStream(path);
+				readable.pipe(writable);
+				await new Promise((resolve, reject) => {
+					writable.on("finish", resolve);
+					writable.on("error", reject);
+				});
 			}
-		} catch (err) {
-			console.error(String(err));
+		} catch (e) {
+			console.error("Backup DB", String(e));
 		}
 	}
 }
