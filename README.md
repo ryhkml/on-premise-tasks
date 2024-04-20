@@ -37,8 +37,8 @@ bun run test
 bun test <FILENAME>
 ```
 
-## Single-file executable
-To start the single-file executable, run:
+## Single file executable
+To start the single file executable, run:
 ```bash
 # Compile
 bun run bin
@@ -56,11 +56,11 @@ docker compose -p <STACK_NAME> down
 ```
 
 ## Path configuration
-You can use absolute path or current path, for example:
+You can use absolute path or current working path, for example:
 ```ts
 // Absolute path
 "/etc/tasks/db/tasks.db"
-// Current path
+// Current working path
 "./db/tasks.db"
 ```
 
@@ -195,8 +195,8 @@ BACKUP_CRON_PATTERN_SQLITE=
 
 ### Set up authentication for Google Cloud Storage
 
-1. Create a service account and do not grant any access, just create! [For more information visit](https://cloud.google.com/iam/docs/service-accounts-create#creating)
-2. Create a new key (select the JSON format) [For more information visit](https://cloud.google.com/iam/docs/keys-create-delete#creating)
+1. [Create a service account](https://cloud.google.com/iam/docs/service-accounts-create#creating) and do not grant any access, just create!
+2. [Create a new key](https://cloud.google.com/iam/docs/keys-create-delete#creating) (select the JSON format)
 3. Go to Google Cloud Storage, create a bucket
 4. Click the three-dot icon in the corner of the bucket table to perform more actions, then click edit access
 5. Click add principal

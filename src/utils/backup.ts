@@ -5,32 +5,9 @@ import { basename } from "node:path";
 
 import { Storage } from "@google-cloud/storage";
 
-export async function backupDb(method: SqliteBackupMethod) {
-	if (method == "LOCAL") {
-		try {
-			const db = file(env.PATH_SQLITE!);
-			const dbShm = file(env.PATH_SQLITE! + "-shm");
-			const dbWal = file(env.PATH_SQLITE! + "-wal");
-			const [isExistsDb, isExistsDbShm, isExistsDbWal] = await Promise.all([
-				db.exists(),
-				dbShm.exists(),
-				dbWal.exists()
-			]);
-			if (isExistsDb) {
-				await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!), db);
-			}
-			if (isExistsDbShm) {
-				await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!) + "-shm", dbShm);
-			}
-			if (isExistsDbWal) {
-				await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!) + "-wal", dbWal);
-			}
-		} catch (e) {
-			console.error("Backup DB", String(e));
-		}
-	}
-	if (method == "GOOGLE_CLOUD_STORAGE") {
-		try {
+export async function backupDb(method: SqliteBackupMethod = "LOCAL") {
+	try {
+		if (method == "GOOGLE_CLOUD_STORAGE") {
 			const paths = [] as Array<string>;
 			const storage = new Storage({
 				projectId: env.BACKUP_GCS_PROJECT_ID_SQLITE,
@@ -42,18 +19,18 @@ export async function backupDb(method: SqliteBackupMethod) {
 				},
 				timeout: 30000
 			});
-			const [isExistsDb, isExistsDbShm, isExistsDbWal] = await Promise.all([
+			const [isExistsBakDb, isExistsBakDbShm, isExistsBakDbWal] = await Promise.all([
 				file(env.PATH_SQLITE!).exists(),
 				file(env.PATH_SQLITE! + "-shm").exists(),
 				file(env.PATH_SQLITE! + "-wal").exists()
 			]);
-			if (isExistsDb) {
+			if (isExistsBakDb) {
 				paths.push(env.PATH_SQLITE!);
 			}
-			if (isExistsDbShm) {
+			if (isExistsBakDbShm) {
 				paths.push(env.PATH_SQLITE! + "-shm");
 			}
-			if (isExistsDbWal) {
+			if (isExistsBakDbWal) {
 				paths.push(env.PATH_SQLITE! + "-wal");
 			}
 			for (let i = 0; i < paths.length; i++) {
@@ -74,8 +51,26 @@ export async function backupDb(method: SqliteBackupMethod) {
 					writable.on("error", reject);
 				});
 			}
-		} catch (e) {
-			console.error("Backup DB", String(e));
+			return;
 		}
+		const db = file(env.PATH_SQLITE!);
+		const dbShm = file(env.PATH_SQLITE! + "-shm");
+		const dbWal = file(env.PATH_SQLITE! + "-wal");
+		const [isExistsDb, isExistsDbShm, isExistsDbWal] = await Promise.all([
+			db.exists(),
+			dbShm.exists(),
+			dbWal.exists()
+		]);
+		if (isExistsDb) {
+			await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!), db);
+		}
+		if (isExistsDbShm) {
+			await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!) + "-shm", dbShm);
+		}
+		if (isExistsDbWal) {
+			await write(env.BACKUP_DIR_SQLITE! + "/bak." + basename(env.PATH_SQLITE!) + "-wal", dbWal);
+		}
+	} catch (e) {
+		console.error("Backup DB", String(e));
 	}
 }

@@ -11,6 +11,7 @@ import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
 import { connectivity } from "./utils/connectivity";
 import { backupDb } from "./utils/backup";
+import { setPragma } from "./db";
 
 const app = new Elysia()
 	.headers({
@@ -43,7 +44,16 @@ const app = new Elysia()
 		return ctx.error;
 	})
 	.use(subscriber())
-	.use(queue());
+	.use(queue())
+	.use(cron({
+		name: "backupDatabase",
+		pattern: env.BACKUP_CRON_PATTERN_SQLITE || Patterns.EVERY_DAY_AT_MIDNIGHT,
+		protect: true,
+		timezone: env.BACKUP_CRON_TZ_SQLITE || env.TZ,
+		run() {
+			backupDb(env.BACKUP_METHOD_SQLITE as SqliteBackupMethod);
+		}
+	}));
 
 connectivity().pipe(
 	switchMap(() => forkJoin([
@@ -69,6 +79,7 @@ connectivity().pipe(
 			console.error("Database file not found");
 			exit(1);
 		} else {
+			setPragma(app.decorator.db);
 			console.log("\x1b[32mDatabase ok!\x1b[0m");
 		}
 		if (env.TZ != "UTC") {
@@ -80,25 +91,6 @@ connectivity().pipe(
 			console.error("Set the value of the CIPHER_KEY environment variable first");
 			exit(1);
 		}
-		// App
-		app.use(cron({
-			name: "pragmaOptimize",
-			pattern: Patterns.EVERY_HOUR,
-			protect: true,
-			timezone: env.TZ,
-			run() {
-				app.decorator.db.run("PRAGMA optimize;");
-			}
-		}));
-		app.use(cron({
-			name: "backupDatabase",
-			pattern: env.BACKUP_CRON_PATTERN_SQLITE || Patterns.EVERY_DAY_AT_MIDNIGHT,
-			protect: true,
-			timezone: env.BACKUP_CRON_TZ_SQLITE || env.TZ,
-			run() {
-				backupDb(env.BACKUP_METHOD_SQLITE as SqliteBackupMethod);
-			}
-		}));
 		app.listen({
 			maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST) || 32768,
 			port: toSafeInteger(env.PORT) || 3200,

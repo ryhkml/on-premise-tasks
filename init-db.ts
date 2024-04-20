@@ -1,6 +1,8 @@
 import { $, env, file, sleep, write } from "bun";
 import { Database } from "bun:sqlite";
 
+import { setPragma } from "./src/db";
+
 async function initDb() {
 	try {
 		const delay = 2000;
@@ -16,11 +18,7 @@ async function initDb() {
 		await write(env.PATH_SQLITE, "");
 		await sleep(delay / 2);
 		const db = new Database(env.PATH_SQLITE);
-		db.run("PRAGMA journal_mode = WAL;");
-		db.run("PRAGMA synchronous = OFF;");
-		db.run("PRAGMA foreign_keys = ON;");
-		db.run("PRAGMA journal_size_limit = 1048576;");
-		db.run("PRAGMA page_size = 32768;");
+		setPragma(db);
 		const [t1, t2, t3, t4] = await Promise.all([
 			file("./src/sql/tables/subscriber.sql").text(),
 			file("./src/sql/tables/queue.sql").text(),
