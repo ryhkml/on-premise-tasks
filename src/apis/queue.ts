@@ -109,7 +109,7 @@ export function queue() {
 			params: "queueId",
 			response: {
 				200: t.Object({
-					message: t.String()
+					message: t.Literal("Done")
 				}),
 				422: t.Object({
 					message: t.String()
@@ -141,7 +141,7 @@ export function queue() {
 			params: "queueId",
 			response: {
 				200: t.Object({
-					message: t.String()
+					message: t.Literal("Running")
 				}),
 				422: t.Object({
 					message: t.String()
@@ -153,8 +153,8 @@ export function queue() {
 			const index = ctx.store.queues.findIndex(queue => queue.id == ctx.params.id);
 			const unsubscribed = unsubscribeQueue(ctx.db, ctx.params.id);
 			if (index == -1 || unsubscribed == null) {
-				return ctx.error("Bad Request", {
-					message: "A request includes an invalid credential or value"
+				return ctx.error("Unprocessable Content", {
+					message: "The request did not meet one of it's preconditions"
 				});
 			}
 			ctx.store.queues[index].subscription.unsubscribe();
@@ -164,6 +164,14 @@ export function queue() {
 		}, {
 			headers: "authHeaders",
 			params: "queueId",
+			response: {
+				200: t.Object({
+					message: t.Literal("Done")
+				}),
+				422: t.Object({
+					message: t.String()
+				})
+			},
 			type: "json"
 		})
 		// Delete queue
@@ -206,7 +214,7 @@ export function queue() {
 			}),
 			response: {
 				200: t.Object({
-					message: t.String()
+					message: t.Literal("Done")
 				}),
 				422: t.Object({
 					message: t.String()
@@ -356,39 +364,13 @@ export function queue() {
 				})
 			}),
 			headers: "authHeaders",
-			detail: {
-				tags: ["Queue"],
-				summary: "Register queue",
-				parameters: [
-					{
-						in: "header",
-						name: "authorization",
-						required: true,
-						example: "Bearer <KEY>"
-					},
-					{
-						in: "header",
-						name: "x-tasks-subscriber-id",
-						required: true,
-						example: "<ID>"
-					}
-				]
-			},
 			response: {
 				201: t.Object({
 					id: t.String(),
-					state: t.String({
-						default: "RUNNING"
-					}),
-					statusCode: t.Integer({
-						default: 0
-					}),
-					estimateEndAt: t.Integer({
-						default: 0
-					}),
-					estimateExecutionAt: t.Integer({
-						default: 0
-					})
+					state: t.Literal("RUNNING"),
+					statusCode: t.Literal(0),
+					estimateEndAt: t.Literal(0),
+					estimateExecutionAt: t.Integer()
 				}),
 				400: t.Object({
 					message: t.String()

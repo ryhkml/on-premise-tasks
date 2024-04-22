@@ -40,6 +40,8 @@ declare global {
 		timeout: number;
 	}
 
+	type TaskState = "DONE" | "ERROR" | "PAUSED" | "RUNNING";
+
 	type TaskSubscriberReq = {
 		httpRequest: TaskHttp;
 		config: TaskConfig;
@@ -48,7 +50,7 @@ declare global {
 	type QueueTable = {
 		id: string;
 		subscriberId: string;
-		state: string;
+		state: TaskState;
 		statusCode: number;
 		estimateEndAt: number;
 		estimateExecutionAt: number;
@@ -65,7 +67,7 @@ declare global {
 		/**
 		 * ATTENTION
 		 *
-		 * `url` property must be decrypted first to become readable plain url
+		 * `url` property must be decrypt first to become readable plain url
 		 *
 		 * @example decr(url, env.CHIPER_KEY)
 		*/
@@ -74,7 +76,7 @@ declare global {
 		/**
 		 * ATTENTION
 		 *
-		 * `bodyStringify` property must be decrypted first and then parsed into an object
+		 * `bodyStringify` property must be decrypt first and then parse into an object
 		 *
 		 * @example JSON.parse(decr(bodyStringify, env.CHIPER_KEY))
 		*/
@@ -82,7 +84,7 @@ declare global {
 		/**
 		 * ATTENTION
 		 *
-		 * `queryStringify` property must be decrypted first and then parsed into an object
+		 * `queryStringify` property must be decrypt first and then parse into an object
 		 *
 		 * @example JSON.parse(decr(queryStringify, env.CHIPER_KEY))
 		*/
@@ -90,7 +92,7 @@ declare global {
 		/**
 		 * ATTENTION
 		 *
-		 * `headersStringify` property must be decrypted first and then parsed into an object
+		 * `headersStringify` property must be decrypt first and then parse into an object
 		 *
 		 * @example JSON.parse(decr(headersStringify, env.CHIPER_KEY))
 		*/
@@ -106,7 +108,7 @@ declare global {
 		/**
 		 * ATTENTION
 		 *
-		 * `retryStatusCode` property must be parsed first to be an array number data type
+		 * `retryStatusCode` property must be parse first to be an array number data type
 		 *
 		 * @example JSON.parse(retryStatusCode)
 		*/

@@ -52,40 +52,16 @@ export function subscriber() {
 					}
 					return subscriber;
 				}, {
-					detail: {
-						tags: ["Subscriber"],
-						summary: "Get subscriber",
-						parameters: [
-							{
-								in: "header",
-								name: "authorization",
-								required: true,
-								example: "Bearer <KEY>"
-							},
-							{
-								in: "header",
-								name: "x-tasks-subscriber-id",
-								required: true,
-								example: "<ID>"
-							}
-						]
-					},
 					response: {
 						200: t.Object({
 							id: t.String(),
 							name: t.String(),
-							createdAt: t.Integer({
-								default: 0
-							}),
-							tasksInQueue: t.Integer({
-								default: 0
-							}),
-							tasksInQueueLimit: t.Integer({
-								default: 1000
-							})
+							createdAt: t.Integer(),
+							tasksInQueue: t.Integer(),
+							tasksInQueueLimit: t.Integer()
 						}),
 						404: t.Object({
-							message: t.Literal("Subscriber not found")
+							message: t.String()
 						})
 					},
 					type: "json"
@@ -103,24 +79,6 @@ export function subscriber() {
 						message: "Done"
 					};
 				}, {
-					detail: {
-						tags: ["Subscriber"],
-						summary: "Delete subscriber",
-						parameters: [
-							{
-								in: "header",
-								name: "authorization",
-								required: true,
-								example: "Bearer <KEY>"
-							},
-							{
-								in: "header",
-								name: "x-tasks-subscriber-id",
-								required: true,
-								example: "<ID>"
-							}
-						]
-					},
 					response: {
 						200: t.Object({
 							message: t.Literal("Done")
@@ -174,16 +132,10 @@ export function subscriber() {
 				}
 			},
 			body: "subscriberName",
-			detail: {
-				tags: ["Subscriber"],
-				summary: "Register subscriber"
-			},
 			response: {
 				201: t.Object({
 					id: t.String(),
-					key: t.Literal("t-" + t.String({
-						contentEncoding: "base64"
-					}))
+					key: t.String()
 				}),
 				409: t.Object({
 					message: t.String()
