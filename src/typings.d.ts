@@ -52,6 +52,8 @@ declare global {
 		subscriberId: string;
 		state: TaskState;
 		statusCode: number;
+		createdAt: number;
+		expiredAt: number;
 		estimateEndAt: number;
 		estimateExecutionAt: number;
 	}
@@ -63,7 +65,6 @@ declare global {
 
 	type ConfigTable = {
 		id: string;
-		queueId: string;
 		/**
 		 * ATTENTION
 		 *

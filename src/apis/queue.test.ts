@@ -219,7 +219,7 @@ describe("Test API", () => {
 			// Wait for tasks
 			await sleep(dueTime + 1500);
 			// ...
-			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.id = c.queueId WHERE q.id = ?;");
+			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.id = c.id WHERE q.id = ?;");
 			const value = q.get(data?.id!);
 			expect(value?.state).toBe("ERROR");
 			expect(value?.retryCount).toBe(3);

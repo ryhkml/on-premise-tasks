@@ -1,6 +1,5 @@
 CREATE TABLE config (
 	id						TEXT UNIQUE PRIMARY KEY,
-	queueId 				TEXT UNIQUE NOT NULL,
 	url 					TEXT NULL,
 	method 					TEXT NULL,
 	bodyStringify 			TEXT NULL,
@@ -18,10 +17,10 @@ CREATE TABLE config (
 	retryExponential 		INTEGER NULL DEFAULT 1,
 	estimateNextRetryAt 	INTEGER NULL DEFAULT 0,
 	timeout 				INTEGER NULL DEFAULT 30000,
-	FOREIGN KEY (queueId) REFERENCES queue(id)
+	FOREIGN KEY (id) REFERENCES queue(id)
 );
 
-CREATE UNIQUE INDEX idxIdQueueId ON config(id, queueId);
+CREATE INDEX idxIdRetrying ON config(id, retrying);
 
 CREATE TRIGGER incrementRetryCount
 BEFORE UPDATE OF retrying ON config

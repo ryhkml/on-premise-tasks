@@ -83,7 +83,8 @@ connectivity().pipe(
 			console.log("\x1b[32mDatabase ok!\x1b[0m");
 		}
 		if (env.TZ != "UTC") {
-			console.log("\x1b[33mTime zone is not using UTC. Make sure the UNIX time request has the same time zone as the server\x1b[0m");
+			console.error("Invalid time zone");
+			exit(1);
 		} else {
 			console.log("\x1b[32mTime zone ok!\x1b[0m");
 		}
