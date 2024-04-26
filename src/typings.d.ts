@@ -19,10 +19,10 @@ declare global {
 		url: string;
 		method: HttpMethod;
 		body?: {
-			[key: string]: string;
+			[key: string]: string | number;
 		};
 		query?: {
-			[key: string]: string;
+			[key: string]: string | number;
 		};
 		headers?: {
 			[key: string]: string;

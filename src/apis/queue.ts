@@ -310,19 +310,34 @@ export function queue() {
 						default: null
 					}),
 					body: t.Optional(
-						t.Record(t.String({ minLength: 1, maxLength: 128 }), t.String({ minLength: 1, maxLength: 4096 }), {
-							default: null
-						})
+						t.Record(
+							t.String({ minLength: 1, maxLength: 128 }),
+							t.Union([
+								t.String({ minLength: 1, maxLength: 4096 }),
+								t.Number()
+							]), {
+								default: null
+							}
+						)
 					),
 					query: t.Optional(
-						t.Record(t.String({ minLength: 1, maxLength: 128 }), t.String({ minLength: 1, maxLength: 4096 }), {
-							default: null
-						})
+						t.Record(
+							t.String({ minLength: 1, maxLength: 128 }),
+							t.Union([
+								t.String({ minLength: 1, maxLength: 4096 }),
+								t.Number()
+							]), {
+								default: null
+							}
+						)
 					),
 					headers: t.Optional(
-						t.Record(t.String({ minLength: 1, maxLength: 128 }), t.String({ minLength: 1, maxLength: 4096 }), {
-							default: null
-						})
+						t.Record(
+							t.String({ minLength: 1, maxLength: 128 }),
+							t.String({ minLength: 1, maxLength: 4096 }), {
+								default: null
+							}
+						)
 					)
 				}),
 				config: t.Object({

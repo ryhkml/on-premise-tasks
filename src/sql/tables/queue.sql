@@ -29,7 +29,7 @@ WHEN NEW.state IN ('DONE', 'ERROR') AND OLD.state = 'RUNNING'
 BEGIN
     UPDATE subscriber SET tasksInQueue = tasksInQueue - 1 WHERE id = NEW.id;
 	UPDATE queue SET expiredAt = (STRFTIME('%s', 'now') * 1000) + 1296000000 WHERE id = NEW.id;
-	UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE id = NEW.id AND retrying == 1;
+	UPDATE config SET retrying = 0, estimateNextRetryAt = 0 WHERE id = NEW.id AND retrying = 1;
 END;
 
 CREATE TRIGGER deleteUnusedConfig
