@@ -3,6 +3,7 @@ CREATE TABLE queue (
 	subscriberId 			TEXT NOT NULL,
 	state 					TEXT NULL DEFAULT 'RUNNING',
 	statusCode 				INTEGER NULL DEFAULT 0,
+	finalize				BLOB NULL,
 	createdAt 				INTEGER NOT NULL,
 	expiredAt 				INTEGER NULL DEFAULT 0,
 	estimateEndAt 			INTEGER NULL DEFAULT 0,

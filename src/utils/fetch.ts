@@ -1,12 +1,5 @@
 import { Observable, timeout } from "rxjs";
 
-interface FetchRes {
-	data: string | Buffer | null;
-	state: "DONE" | "ERROR";
-	status: number;
-	statusText: string;
-}
-
 export function fetchHttp(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: string }) {
 	const source$ = new Observable<FetchRes>(observer => {
 		let headers = {};
@@ -43,10 +36,14 @@ export function fetchHttp(req: TaskSubscriberReq, additionalHeaders?: { [k: stri
 		})
 		.then(async res => {
 			try {
+				const MAX_SIZE_DATA_RESPONSE = 32768;
 				const text = await res.text();
+				const len = Buffer.byteLength(text, "utf-8");
 				if (res.ok) {
 					observer.next({
-						data: Buffer.from(text).toString("base64"),
+						data: len > MAX_SIZE_DATA_RESPONSE
+							? Buffer.from("The response data size exceeds the limit")
+							: Buffer.from(text),
 						state: "DONE",
 						status: res.status,
 						statusText: res.statusText || "Unknown"
@@ -54,7 +51,9 @@ export function fetchHttp(req: TaskSubscriberReq, additionalHeaders?: { [k: stri
 					observer.complete();
 				} else {
 					observer.error({
-						data: Buffer.from(text).toString("base64"),
+						data: len > MAX_SIZE_DATA_RESPONSE
+							? Buffer.from("The response data size exceeds the limit")
+							: Buffer.from(text),
 						state: "ERROR",
 						status: res.status,
 						statusText: res.statusText || "Unknown"

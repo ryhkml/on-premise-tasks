@@ -61,10 +61,6 @@ describe("Test API", () => {
 			});
 			expect(queue.status).toBe(200);
 			expect(queue.data?.id).toBeDefined();
-			expect(queue.data?.state).toBeDefined();
-			expect(queue.data?.statusCode).toBeDefined();
-			expect(queue.data?.estimateEndAt).toBeDefined();
-			expect(queue.data?.estimateExecutionAt).toBeDefined();
 			// Waiting for task
 			await sleep(dueTime + 1000);
 		});

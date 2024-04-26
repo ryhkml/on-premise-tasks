@@ -15,21 +15,21 @@ declare global {
 
 	type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
-	type TaskHttp = {
+	interface TaskHttp {
 		url: string;
 		method: HttpMethod;
 		body?: {
 			[key: string]: string | number;
 		};
 		query?: {
-			[key: string]: string | number;
+			[key: string]: string;
 		};
 		headers?: {
 			[key: string]: string;
 		};
 	}
 
-	type TaskConfig = {
+	interface TaskConfig {
 		executionDelay: number;
 		executeAt: number;
 		retry: number;
@@ -42,7 +42,7 @@ declare global {
 
 	type TaskState = "DONE" | "ERROR" | "PAUSED" | "RUNNING";
 
-	type TaskSubscriberReq = {
+	interface TaskSubscriberReq {
 		httpRequest: TaskHttp;
 		config: TaskConfig;
 	}
@@ -52,6 +52,7 @@ declare global {
 		subscriberId: string;
 		state: TaskState;
 		statusCode: number;
+		finalize: Uint8Array | null;
 		createdAt: number;
 		expiredAt: number;
 		estimateEndAt: number;
@@ -117,6 +118,13 @@ declare global {
 		retryExponential: number;
 		estimateNextRetryAt: number;
 		timeout: number;
+	}
+
+	type FetchRes = {
+		data: Buffer | null;
+		state: Exclude<TaskState, "PAUSED" | "RUNNING">;
+		status: number;
+		statusText: string;
 	}
 
 	type SqliteBackupMethod = "LOCAL" | "GOOGLE_CLOUD_STORAGE";

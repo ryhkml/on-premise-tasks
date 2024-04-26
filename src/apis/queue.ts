@@ -33,7 +33,7 @@ export function queue() {
 			queueId: t.Object({
 				id: t.String({
 					default: null,
-					pattern: "^[0-9][A-Z0-9]{24}$"
+					pattern: "^[0-9A-F]{24}$"
 				})
 			})
 		})
@@ -70,16 +70,26 @@ export function queue() {
 		}, {
 			headers: "authHeaders",
 			params: "queueId",
+			afterHandle(ctx) {
+				if (typeof ctx.response === "object" && "finalize" in ctx.response! && ctx.response.finalize) {
+					const buff = Buffer.from(ctx.response.finalize as Uint8Array);
+					return {
+						...ctx.response,
+						finalize: buff.toString()
+					};
+				}
+			},
 			response: {
 				200: t.Object({
 					id: t.String(),
 					state: t.String(),
 					statusCode: t.Integer(),
-					createdAt: t.Integer(),
-					expiredAt: t.Union([
-						t.Null(),
-						t.Integer()
+					finalize: t.Union([
+						t.String(),
+						t.Null()
 					]),
+					createdAt: t.Integer(),
+					expiredAt: t.Integer(),
 					estimateEndAt: t.Integer(),
 					estimateExecutionAt: t.Integer()
 				}),
@@ -323,12 +333,7 @@ export function queue() {
 					query: t.Optional(
 						t.Record(
 							t.String({ minLength: 1, maxLength: 128 }),
-							t.Union([
-								t.String({ minLength: 1, maxLength: 4096 }),
-								t.Number()
-							]), {
-								default: null
-							}
+							t.String({ minLength: 1, maxLength: 4096 })
 						)
 					),
 					headers: t.Optional(
@@ -503,8 +508,10 @@ type SubscriptionContext = {
 
 function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queueId: string) {
 	const log = toSafeInteger(env.LOG) == 1;
-	const stmtQ = ctx.db.prepare<void, [string, number, number, string]>("UPDATE queue SET state = ?1, statusCode = ?2, estimateEndAt = ?3 WHERE id = ?4 AND subscriberId IN (SELECT id FROM subscriber);");
+	const stmtQ = ctx.db.prepare<void, [string, number, Buffer, number, string]>("UPDATE queue SET state = ?1, statusCode = ?2, finalize = ?3, estimateEndAt = ?4 WHERE id = ?5 AND subscriberId IN (SELECT id FROM subscriber);");
 	const stmtC = ctx.db.prepare<Pick<ConfigTable, "retryCount" | "retryLimit">, string>("UPDATE config SET retrying = 1 WHERE id = ? AND id IN (SELECT id FROM queue) RETURNING retryCount, retryLimit;");
+	const stmtQErr = ctx.db.prepare<void, [number, Buffer, string]>("UPDATE queue SET statusCode = ?1, finalize = ?2 WHERE id = ?3 AND subscriberId IN (SELECT id FROM subscriber);");
+	const stmtCErr = ctx.db.prepare<void, [string, number, string]>("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE id = ?3 AND id IN (SELECT id FROM queue);");
 	ctx.store.queues.push({
 		id: queueId,
 		subscription: timer(dueTime).pipe(
@@ -512,7 +519,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 				let additionalHeaders = {} as { [k: string]: string };
 				let stateMs = 0;
 				return defer(() => fetchHttp(ctx.body, additionalHeaders)).pipe(
-					catchError(error => {
+					catchError((error: FetchRes) => {
 						if (error instanceof TimeoutError) {
 							return throwError(() => ({
 								data: null,
@@ -537,7 +544,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 					}),
 					retry({
 						count: ctx.body.config.retry,
-						delay() {
+						delay(error: FetchRes) {
 							const retryingAt = Date.now();
 							const { retryCount, retryLimit } = stmtC.get(queueId)!;
 							let errorDueTime = 0 as number | Date;
@@ -558,11 +565,18 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 								"X-Tasks-Retry-Limit": retryLimit.toString(),
 								"X-Tasks-Estimate-Next-Retry-At": estimateNextRetryAt.toString()
 							};
-							ctx.db.run("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE id = ?3 AND id IN (SELECT id FROM queue);", [
-								encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + queueId),
-								estimateNextRetryAt,
-								queueId
-							]);
+							ctx.db.transaction(() => {
+								stmtQErr.run(
+									error.status,
+									error.data!,
+									queueId
+								);
+								stmtCErr.run(
+									encr(JSON.stringify(additionalHeaders), kebabCase(ctx.db.filename) + ":" + queueId),
+									estimateNextRetryAt,
+									queueId
+								);
+							})();
 							if (log) {
 								if (typeof errorDueTime === "number") {
 									stateMs += errorDueTime;
@@ -583,18 +597,22 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 		)
 		.subscribe({
 			next(res) {
-				stmtQ.run("DONE", res.status, Date.now(), queueId);
+				stmtQ.run("DONE", res.status, res.data!, Date.now(), queueId);
 				stmtQ.finalize();
 				stmtC.finalize();
+				stmtQErr.finalize();
+				stmtCErr.finalize();
 				if (log) {
 					console.log();
 					console.log("DONE", res);
 				}
 			},
-			error(err) {
-				stmtQ.run("ERROR", err.status, Date.now(), queueId);
+			error(err: FetchRes) {
+				stmtQ.run("ERROR", err.status, err.data!, Date.now(), queueId);
 				stmtQ.finalize();
 				stmtC.finalize();
+				stmtQErr.finalize();
+				stmtCErr.finalize();
 				if (log) {
 					console.error();
 					console.error("ERROR", err);
@@ -605,7 +623,7 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 }
 
 function registerQueue(ctx: SubscriptionContext) {
-	const queueId = genId(ctx.today);
+	const queueId = randomBytes(12).toString("hex").toUpperCase();
 	const key = genKey(queueId);
 	const dueTime = !!ctx.body.config.executeAt
 		? new Date(ctx.body.config.executeAt)
@@ -685,6 +703,7 @@ function registerQueue(ctx: SubscriptionContext) {
 		id: queueId,
 		state: "RUNNING",
 		statusCode: 0,
+		finalize: null,
 		createdAt: ctx.today,
 		expiredAt: 0,
 		estimateEndAt: 0,
@@ -711,7 +730,7 @@ function deleteQueue(db: Database, queueId: string, forceDelete = false) {
 type QueueQuery = Omit<QueueTable, "subscriberId">;
 
 function getQueue(db: Database, queueId: string) {
-	const q = db.query<QueueQuery, string>("SELECT id, state, createdAt, expiredAt, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE id = ?;");
+	const q = db.query<QueueQuery, string>("SELECT id, state, createdAt, expiredAt, statusCode, finalize, estimateEndAt, estimateExecutionAt FROM queue WHERE id = ?;");
 	const queue = q.get(queueId);
 	q.finalize();
 	if (queue == null) {
@@ -842,8 +861,4 @@ function resubscribeQueue(db: Database) {
 
 function genKey(configId: string) {
 	return toString(env.CIPHER_KEY) + ":" + configId;
-}
-
-function genId(dateAt: number, start = 8, size = 10) {
-	return dateAt.toString().substring(start) + randomBytes(size).toString("hex").toUpperCase();
 }
