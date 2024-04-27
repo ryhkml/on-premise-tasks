@@ -394,6 +394,7 @@ export function queue() {
 					id: t.String(),
 					state: t.Literal("RUNNING"),
 					statusCode: t.Literal(0),
+					finalize: t.Null(),
 					createdAt: t.Integer(),
 					expiredAt: t.Null(),
 					estimateEndAt: t.Literal(0),
