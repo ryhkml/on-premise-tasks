@@ -25,7 +25,7 @@ export function fetchHttp(req: TaskSubscriberReq, additionalHeaders?: { [k: stri
 			method: req.httpRequest.method,
 			cache: "no-cache",
 			body: !!req.httpRequest.body
-				? JSON.stringify(req.httpRequest.body)
+				? Buffer.from(JSON.stringify(req.httpRequest.body))
 				: undefined,
 			headers: {
 				...headers,

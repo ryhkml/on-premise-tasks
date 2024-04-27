@@ -392,8 +392,13 @@ export function queue() {
 						t.Record(
 							t.String({ minLength: 1, maxLength: 128 }),
 							t.Union([
-								t.String({ minLength: 1, maxLength: 4096 }),
-								t.Number()
+								t.String({
+									minLength: 1,
+									maxLength: Number.MAX_SAFE_INTEGER
+								}),
+								t.Number({
+									maximum: Number.MAX_SAFE_INTEGER
+								})
 							]), {
 								default: null
 							}
@@ -417,11 +422,13 @@ export function queue() {
 				config: t.Object({
 					executionDelay: t.Integer({
 						default: 1,
-						minimum: 0
+						minimum: 0,
+						maximum: Number.MAX_SAFE_INTEGER
 					}),
 					executeAt: t.Integer({
 						default: 0,
-						minimum: 0
+						minimum: 0,
+						maximum: Number.MAX_SAFE_INTEGER
 					}),
 					retry: t.Integer({
 						default: 0,
@@ -430,7 +437,8 @@ export function queue() {
 					}),
 					retryAt: t.Integer({
 						default: 0,
-						minimum: 0
+						minimum: 0,
+						maximum: Number.MAX_SAFE_INTEGER
 					}),
 					retryInterval: t.Integer({
 						default: 0,
