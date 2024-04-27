@@ -138,10 +138,10 @@ describe("Test API", () => {
 
 	describe("GET /queues/:id", () => {
 		it("should successfully get the queue", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -170,11 +170,11 @@ describe("Test API", () => {
 	});
 
 	describe("POST /queues/register", () => {
-		it("should successfully register the queue and wait 3000 milliseconds until the task has been successfully executed", async () => {
-			const dueTime = 3000;
+		it("should successfully register the queue and wait one seconds until the task has been successfully executed", async () => {
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -190,18 +190,18 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await sleep(dueTime + 1000);
+			await sleep(dueTime * 2);
 			// ...
 			const q = db.query<Pick<QueueTable, "state" | "statusCode">, string>("SELECT state, statusCode FROM queue WHERE id = ?;");
 			const { state, statusCode } = q.get(data?.id!)!;
 			expect(state).toBe("DONE");
 			expect(statusCode).toBe(200);
 		});
-		it("should successfully register the queue and wait 3000 milliseconds until the task returns an error response", async () => {
-			const dueTime = 3000;
+		it("should successfully register the queue and wait one seconds until the task returns an error response", async () => {
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://api.starlink.com",
+					url: "https://dummyjson.com/todos/0",
 					method: "GET"
 				},
 				config: {
@@ -232,7 +232,7 @@ describe("Test API", () => {
 			setSystemTime();
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -250,14 +250,14 @@ describe("Test API", () => {
 		it("should respond with status code 400 if the \"retryAt\" execution time is earlier than the execution time", async () => {
 			// It was 2012 for a moment.. 💀
 			setSystemTime(new Date("2012-12-12"));
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const retryAt = new Date().getTime() + dueTime;
 			expect(new Date().getFullYear()).toBe(2012);
 			// Reset
 			setSystemTime();
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -275,10 +275,10 @@ describe("Test API", () => {
 		});
 		it("should respond with status code 429 if the number of tasks in queue is greater than the task in queue limit", async () => {
 			db.run("UPDATE subscriber SET tasksInQueue = 1000 WHERE name = ?;", [name]);
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -294,10 +294,10 @@ describe("Test API", () => {
 			expect(status).toBe(429);
 		});
 		it("should retry 3 times if the task gives an error response", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://api.starlink.com",
+					url: "https://dummyjson.com/todos/0",
 					method: "GET"
 				},
 				config: {
@@ -316,7 +316,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for tasks
-			await sleep(dueTime + 1500);
+			await sleep(dueTime * 3);
 			// ...
 			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.id = c.id WHERE q.id = ?;");
 			const value = q.get(data?.id!);
@@ -327,10 +327,10 @@ describe("Test API", () => {
 
 	describe("PATCH /queues/:id/pause", () => {
 		it("should successfully pause the queue", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -364,10 +364,10 @@ describe("Test API", () => {
 
 	describe("PATCH /queues/:id/resume", () => {
 		it("should successfully pause the queue and then resume queue", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -422,10 +422,10 @@ describe("Test API", () => {
 
 	describe("PATCH /queues/:id/unsubscribe", () => {
 		it("should successfully unsubscribe the queue", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -456,10 +456,10 @@ describe("Test API", () => {
 
 	describe("DELETE /queues/:id", () => {
 		it("should successfully delete the queue", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -493,10 +493,10 @@ describe("Test API", () => {
 			expect(queue).toBe(null);
 		});
 		it("should successfully force delete the queue", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {
@@ -530,10 +530,10 @@ describe("Test API", () => {
 			expect(queue).toBe(null);
 		});
 		it("should respond with status code 422 if tasks in queue are deleted without force", async () => {
-			const dueTime = 3000;
+			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://www.starlink.com",
+					url: "https://dummyjson.com/todos/1",
 					method: "GET"
 				},
 				config: {

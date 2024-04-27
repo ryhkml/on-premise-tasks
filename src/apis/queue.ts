@@ -338,6 +338,13 @@ export function queue() {
 				}
 			},
 			beforeHandle(ctx) {
+				const defaultConfigLen = Object.keys(ctx.defaultConfig).length;
+				const configLen = Object.keys(ctx.body.config).length;
+				if (defaultConfigLen != configLen) {
+					return ctx.error("Bad Request", {
+						message: "There is an invalid configuration name"
+					});
+				}
 				const statusTasksInQueue = ctx.stmtSubscriberTasksInQueue.get(ctx.id);
 				if (statusTasksInQueue == null) {
 					return ctx.error("Too Many Requests", {

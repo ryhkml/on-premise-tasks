@@ -9,7 +9,7 @@ describe("Test FETCH", () => {
 	it("should respond to \"FetchRes\" if the http request is successful", async () => {
 		fetchHttp({
 			httpRequest: {
-				url: "https://www.starlink.com",
+				url: "https://dummyjson.com/todos/1",
 				method: "GET"
 			},
 			config: queueApp.decorator.defaultConfig
@@ -26,7 +26,7 @@ describe("Test FETCH", () => {
 	it("should respond to \"FetchRes\" if the http request fails", async () => {
 		fetchHttp({
 			httpRequest: {
-				url: "https://api.starlink.com",
+				url: "https://dummyjson.com/todos/0",
 				method: "GET"
 			},
 			config: queueApp.decorator.defaultConfig

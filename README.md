@@ -83,16 +83,16 @@ You can use absolute path or current working path, for example:
 
 ### Types
 ```ts
-type TaskSubscriberRequest = {
+interface TaskSubscriberRequest {
     httpRequest: TasksHttp;
     config?: TasksConfig;
 }
 
-type TasksHttp = {
+interface TasksHttp {
     url: string;
     method: "GET" | "POST" | "DELETE" | "PATCH" | "PUT";
     body?: {
-        [key: string]: string;
+        [key: string]: string | number;
     };
     query?: {
         [key: string]: string;
@@ -102,7 +102,7 @@ type TasksHttp = {
     };
 }
 
-type TasksConfig = {
+interface TasksConfig {
     executionDelay?: number; // Default 1ms, min: 0
     executeAt?: number; // Default 0
     retry?: number; // Default 0, min: 0, max: 4096
@@ -117,7 +117,7 @@ An example of requesting a Task
 ```json
 {
     "httpRequest": {
-        "url": "https://api.starlink.com",
+        "url": "https://dummyjson.com/todos/1",
         "method": "GET"
     },
     "config": {
@@ -152,11 +152,11 @@ Additionally, you can make a specific request by using `executeAt`
 ```json
 {
     "httpRequest": {
-        "url": "https://api.starlink.com",
+        "url": "https://dummyjson.com/todos/1",
         "method": "GET"
     },
     "config": {
-        "executeAt": 1710880762570
+        "executeAt": 2619277200000
     }
 }
 ```

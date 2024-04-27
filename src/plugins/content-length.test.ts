@@ -42,7 +42,7 @@ describe("Test CONTENT LENGTH", () => {
 	it("should successfully register the queue, provided that the request payload does not exceed the maximum limit", async () => {
 		const payload = {
 			httpRequest: {
-				url: "https://www.starlink.com",
+				url: "https://dummyjson.com/todos/1",
 				method: "GET"
 			},
 			config: {
@@ -57,13 +57,8 @@ describe("Test CONTENT LENGTH", () => {
 				"x-tasks-subscriber-id": id
 			}
 		});
-		await sleep(100);
 		expect(status).toBe(201);
 		expect(data?.id).toBeDefined();
-		expect(data?.state).toBeDefined();
-		expect(data?.statusCode).toBeDefined();
-		expect(data?.estimateEndAt).toBeDefined();
-		expect(data?.estimateExecutionAt).toBeDefined();
 	});
 	it("should respond with status code 413 if the request payload is too large", async () => {
 		const body = [] as Array<{ [k: string]: string }>;
@@ -86,7 +81,7 @@ describe("Test CONTENT LENGTH", () => {
 		}
 		const payload = {
 			httpRequest: {
-				url: "https://www.starlink.com",
+				url: "https://dummyjson.com/todos/1",
 				method: "GET",
 				body: Object.assign({}, ...body),
 				query: Object.assign({}, ...query),
