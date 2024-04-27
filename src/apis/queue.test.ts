@@ -33,6 +33,109 @@ describe("Test API", () => {
 		await sleep(1);
 	});
 
+	describe("GET /queues", () => {
+		it("should successfully get the queues", async () => {
+			const { data, status } = await queueApi.queues.register.post({
+				httpRequest: {
+					url: "https://dummyjson.com/todos/1",
+					method: "GET"
+				},
+				config: {
+					...queueApp.decorator.defaultConfig,
+					executionDelay: 1
+				}
+			}, {
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				}
+			});
+			expect(status).toBe(201);
+			expect(data?.id).toBeDefined();
+			const queues = await queueApi.queues.get({
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				},
+				query: {
+
+				}
+			});
+			expect(queues.status).toBe(200);
+			expect(queues.data).toBeArray();
+			expect(queues.data).toBeArrayOfSize(1);
+			await sleep(1000);
+		});
+		it("should successfully get the queues with \"limit\" query", async () => {
+			for (let i = 0; i < 5; i++) {
+				const tId = i + 1;
+				const { data, status } = await queueApi.queues.register.post({
+					httpRequest: {
+						url: "https://dummyjson.com/todos/" + tId.toString(),
+						method: "GET"
+					},
+					config: {
+						...queueApp.decorator.defaultConfig,
+						executionDelay: 1
+					}
+				}, {
+					headers: {
+						"authorization": "Bearer " + key,
+						"x-tasks-subscriber-id": id
+					}
+				});
+				expect(status).toBe(201);
+				expect(data?.id).toBeDefined();
+			}
+			const queues = await queueApi.queues.get({
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				},
+				query: {
+					limit: 5
+				}
+			});
+			expect(queues.status).toBe(200);
+			expect(queues.data).toBeArrayOfSize(5);
+			await sleep(1000);
+		});
+		it("should successfully get the queues with \"offset\" query", async () => {
+			for (let i = 0; i < 5; i++) {
+				const tId = i + 1;
+				const { data, status } = await queueApi.queues.register.post({
+					httpRequest: {
+						url: "https://dummyjson.com/todos/" + tId.toString(),
+						method: "GET"
+					},
+					config: {
+						...queueApp.decorator.defaultConfig,
+						executionDelay: 1
+					}
+				}, {
+					headers: {
+						"authorization": "Bearer " + key,
+						"x-tasks-subscriber-id": id
+					}
+				});
+				expect(status).toBe(201);
+				expect(data?.id).toBeDefined();
+			}
+			const queues = await queueApi.queues.get({
+				headers: {
+					"authorization": "Bearer " + key,
+					"x-tasks-subscriber-id": id
+				},
+				query: {
+					offset: 1
+				}
+			});
+			expect(queues.status).toBe(200);
+			expect(queues.data).toBeArrayOfSize(4);
+			await sleep(1000);
+		});
+	});
+
 	describe("GET /queues/:id", () => {
 		it("should successfully get the queue", async () => {
 			const dueTime = 3000;

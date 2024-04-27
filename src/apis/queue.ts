@@ -58,6 +58,75 @@ export function queue() {
 			timeout: 30000
 		})
 		.decorate("subject", new BehaviorSubject(null))
+		// Get queues
+		.get("", ctx => {
+			return getQueues(ctx.db, ctx.id, ctx.query.order, ctx.query.by, ctx.query.limit, ctx.query.offset);
+		}, {
+			headers: "authHeaders",
+			transform(ctx) {
+				if (ctx.query?.offset == null) {
+					ctx.query["offset"] = 0;
+				} else {
+					ctx.query.offset = toSafeInteger(ctx.query.offset);
+				}
+				if (ctx.query?.limit == null) {
+					ctx.query["limit"] = 10;
+				} else {
+					ctx.query.limit = toSafeInteger(ctx.query.limit);
+				}
+				if (ctx.query?.order == null) {
+					ctx.query["order"] = "createdAt";
+				}
+				if (ctx.query?.by == null) {
+					ctx.query["by"] = "ASC";
+				} else {
+					ctx.query.by = ctx.query.by.toUpperCase() as QueuesBy;
+				}
+			},
+			query: t.Object({
+				offset: t.Optional(t.Integer({
+					minimum: 0,
+					maximum: Number.MAX_SAFE_INTEGER,
+					default: 0
+				})),
+				limit: t.Optional(t.Integer({
+					minimum: 1,
+					maximum: 100,
+					default: 10
+				})),
+				order: t.Optional(t.Union([
+					t.Literal("createdAt"),
+					t.Literal("expiredAt"),
+					t.Literal("estimateEndAt"),
+					t.Literal("estimateExecutionAt")
+				], {
+					default: "createdAt"
+				})),
+				by: t.Optional(t.Union([
+					t.Literal("ASC"),
+					t.Literal("DESC")
+				], {
+					default: "ASC"
+				})),
+			}),
+			response: {
+				200: t.Array(
+					t.Object({
+						id: t.String(),
+						state: t.String(),
+						statusCode: t.Integer(),
+						createdAt: t.Integer(),
+						expiredAt: t.Union([
+							t.Integer(),
+							t.Null()
+						]),
+						estimateEndAt: t.Integer(),
+						estimateExecutionAt: t.Integer()
+					})
+				)
+			},
+			type: "json"
+		})
 		// Get queue
 		.get("/:id", ctx => {
 			const queue = getQueue(ctx.db, ctx.params.id);
@@ -728,7 +797,7 @@ function deleteQueue(db: Database, queueId: string, forceDelete = false) {
 	return queue.deleted;
 }
 
-type QueueQuery = Omit<QueueTable, "subscriberId">;
+type QueueQuery = Omit<QueueTable, "subscriberId">
 
 function getQueue(db: Database, queueId: string) {
 	const q = db.query<QueueQuery, string>("SELECT id, state, createdAt, expiredAt, statusCode, finalize, estimateEndAt, estimateExecutionAt FROM queue WHERE id = ?;");
@@ -738,6 +807,23 @@ function getQueue(db: Database, queueId: string) {
 		return null;
 	}
 	return queue;
+}
+
+type QueuesQuery = Omit<QueueQuery, "finalize">
+type QueuesOrder = "createdAt" | "expiredAt" | "estimateEndAt" | "estimateExecutionAt"
+type QueuesBy = "ASC" | "DESC"
+
+function getQueues(db: Database, id: string, order: QueuesOrder = "createdAt", by: QueuesBy = "ASC", limit = 10, offset = 0) {
+	let raw = "";
+	if (by == "ASC") {
+		raw = "SELECT id, state, createdAt, expiredAt, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE subscriberId = ?1 ORDER BY ?2 ASC LIMIT ?3 OFFSET ?4;";
+	} else {
+		raw = "SELECT id, state, createdAt, expiredAt, statusCode, estimateEndAt, estimateExecutionAt FROM queue WHERE subscriberId = ?1 ORDER BY ?2 DESC LIMIT ?3 OFFSET ?4;";
+	}
+	const q = db.query<QueuesQuery, [string, QueuesOrder, number, number]>(raw);
+	const queues = q.all(id, order, limit, offset);
+	q.finalize();
+	return queues;
 }
 
 function transformQueue(db: Database, rQueue: ResumeQueueQuery, beforeAt: number, terminated = false) {

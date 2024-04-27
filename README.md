@@ -71,6 +71,7 @@ You can use absolute path or current working path, for example:
 - `POST /subscribers/register` ✅
 
 ### Queue
+- `GET /queues` ✅
 - `GET /queues/:id` ✅
 - `PATCH /queues/:id` ❌
 - `DELETE /queues/:id` ✅
