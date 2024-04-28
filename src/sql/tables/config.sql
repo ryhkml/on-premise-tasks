@@ -2,7 +2,7 @@ CREATE TABLE config (
 	id						TEXT UNIQUE PRIMARY KEY,
 	url 					TEXT NULL,
 	method 					TEXT NULL,
-	bodyStringify 			TEXT NULL,
+	dataStringify 			TEXT NULL,
 	queryStringify 			TEXT NULL,
 	headersStringify 		TEXT NULL,
 	executionDelay 			INTEGER NULL DEFAULT 1,
@@ -23,7 +23,7 @@ CREATE TABLE config (
 CREATE INDEX idxIdRetrying ON config(id, retrying);
 
 CREATE TRIGGER incrementRetryCount
-BEFORE UPDATE OF retrying ON config
+AFTER UPDATE OF retrying ON config
 WHEN NEW.retrying = 1
 BEGIN
     UPDATE config SET retryCount = retryCount + 1 WHERE id = NEW.id;

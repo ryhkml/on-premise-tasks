@@ -13,5 +13,5 @@ CREATE INDEX idxIdTasksInQueueLimit ON subscriber(id, tasksInQueue, tasksInQueue
 CREATE TRIGGER deleteUnusedQueue
 AFTER DELETE ON subscriber
 BEGIN
-	DELETE FROM queue WHERE NOT EXISTS (SELECT 'Done' AS deleted FROM queue WHERE id = OLD.id);
+	DELETE FROM queue WHERE subscriberId = OLD.id;
 END;
