@@ -4,12 +4,10 @@
     </h1>
 </div>
 
-On-Premise Tasks is a managed execution service for task delivery or distribution needs. Technically, a Task is an object that represents a single-use execution resource. You can request tasks from On-Premise Tasks, which will then be executed at a future time. As long as you have an API service, On-Premise Tasks will execute them and send them to the specified target URL.
+On-Premise Tasks is a managed execution service for task delivery or distribution needs. Technically, a task is an object that represents a single-use execution resource. You can request tasks to On-Premise Tasks, which will then be executed at a future time. On-Premise Tasks will execute it and send it to the specified target URL
 
-```
-Your app                        Tasks server                Target server
-[TASK] ------(register)------>  [QUEUE] ------(http)------> [SERVER]
-                                [QUEUE] <------------------ [SERVER]
+```txt
+[TASK] ———————(register)———————> [QUEUE] ———————(http)———————> [SERVICE]
 ```
 
 ## Features
@@ -90,8 +88,8 @@ interface TaskSubscriberRequest {
 
 interface TasksHttp {
     url: string;
-    method: "GET" | "POST" | "DELETE" | "PATCH" | "PUT";
-    body?: {
+    method?: "GET" | "POST" | "DELETE" | "PATCH" | "PUT";
+    data?: string | {
         [key: string]: string | number;
     };
     query?: {

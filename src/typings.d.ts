@@ -17,8 +17,8 @@ declare global {
 
 	interface TaskHttp {
 		url: string;
-		method: HttpMethod;
-		body?: {
+		method?: HttpMethod;
+		data?: string | {
 			[key: string]: string | number;
 		};
 		query?: {
@@ -78,11 +78,11 @@ declare global {
 		/**
 		 * ATTENTION
 		 *
-		 * `bodyStringify` property must be decrypt first and then parse into an object
+		 * `dataStringify` property must be decrypt first and then parse into an object
 		 *
-		 * @example JSON.parse(decr(bodyStringify, env.CHIPER_KEY))
+		 * @example JSON.parse(decr(dataStringify, env.CHIPER_KEY))
 		*/
-		bodyStringify: string | null;
+		dataStringify: string | null;
 		/**
 		 * ATTENTION
 		 *

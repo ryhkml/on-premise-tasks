@@ -11,25 +11,33 @@ COPY bun.lockb ./
 COPY src ./src/
 COPY .env.production ./
 
-RUN bun install --frozen-lockfile --production && \
+RUN apt update && \
+	apt upgrade && \
+	apt install -y curl && \
+	bun install --frozen-lockfile --production && \
     mkdir db && \
     bun --env-file=.env.production run init-db.ts && \
     bun --env-file=.env.production test --timeout 10000 && \
     bun --env-file=.env.production run init-db.ts && \
-    bun build --compile --minify --sourcemap ./src/main.ts --outfile ./tasks
+    bun build --compile --target=bun-linux-x64 --minify --sourcemap ./src/main.ts --outfile ./tasks
 
 # Final stage
-FROM gcr.io/distroless/base-debian12
+FROM rockylinux:9-minimal
 
 LABEL maintainer="Reyhan Kamil <mail@ryhkml.dev>"
 
 ARG PORT
 
-WORKDIR /app
+RUN groupadd -g 1000 app && \
+    useradd -g app -u 1000 -ms /bin/bash app
 
-COPY --from=build /app/db ./db/
-COPY --from=build /app/tasks ./
+WORKDIR /home/app
+
+COPY --from=build --chown=app:app /app/db ./db/
+COPY --from=build --chown=app:app /app/tasks ./
+
+USER app
 
 EXPOSE $PORT/tcp
 
-CMD ["/app/tasks"]
+CMD ["/home/app/tasks"]

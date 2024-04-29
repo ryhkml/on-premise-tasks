@@ -316,7 +316,7 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Wait for tasks
-			await sleep(dueTime * 3);
+			await sleep((dueTime * 3) + dueTime);
 			// ...
 			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.id = c.id WHERE q.id = ?;");
 			const value = q.get(data?.id!);
@@ -475,16 +475,15 @@ describe("Test API", () => {
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
 			// Waiting for task
-			await sleep(dueTime + 1000);
+			await sleep(dueTime * 2);
 			// ...
 			const deleted = await queueApi.queues({ id: data?.id! }).delete(null, {
 				headers: {
 					"authorization": "Bearer " + key,
 					"x-tasks-subscriber-id": id
 				},
-				query: {
-
-				}
+				// @ts-ignore
+				query: undefined
 			});
 			expect(deleted.status).toBe(200);
 			expect(deleted.data?.message).toBeDefined();
@@ -556,9 +555,8 @@ describe("Test API", () => {
 					"authorization": "Bearer " + key,
 					"x-tasks-subscriber-id": id
 				},
-				query: {
-
-				}
+				// @ts-ignore
+				query: undefined
 			});
 			expect(deleted.status).toBe(422);
 		});

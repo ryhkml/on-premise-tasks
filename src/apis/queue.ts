@@ -7,8 +7,8 @@ import { Elysia, t } from "elysia";
 import { cron, Patterns } from "@elysiajs/cron";
 
 import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
-import { BehaviorSubject, TimeoutError, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
-import { kebabCase, toSafeInteger, toString } from "lodash";
+import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
+import { isPlainObject, kebabCase, toSafeInteger, toString } from "lodash";
 
 import { fetchHttp } from "../utils/fetch";
 import { pluginAuth } from "../plugins/auth";
@@ -140,7 +140,8 @@ export function queue() {
 			headers: "authHeaders",
 			params: "queueId",
 			afterHandle(ctx) {
-				if (typeof ctx.response === "object" && "finalize" in ctx.response! && ctx.response.finalize) {
+				// @ts-ignore
+				if (isPlainObject(ctx.response) && "finalize" in ctx.response! && ctx.response.finalize) {
 					const buff = Buffer.from(ctx.response.finalize as Uint8Array);
 					return {
 						...ctx.response,
@@ -317,10 +318,12 @@ export function queue() {
 					...ctx.defaultConfig,
 					...ctx.body.config
 				};
-				if (ctx.body.httpRequest.body && (ctx.body.httpRequest.method == "GET" || ctx.body.httpRequest.method == "DELETE")) {
-					ctx.body.httpRequest.body = undefined;
+				if (ctx.body.httpRequest.method) {
+					if (ctx.body.httpRequest.data && (ctx.body.httpRequest.method == "GET" || ctx.body.httpRequest.method == "DELETE")) {
+						ctx.body.httpRequest.data = undefined;
+					}
+					ctx.body.httpRequest.method = ctx.body.httpRequest.method.toUpperCase() as HttpMethod;
 				}
-				ctx.body.httpRequest.method = ctx.body.httpRequest.method.toUpperCase() as HttpMethod;
 				if (ctx.body.config.executeAt) {
 					ctx.body.config.executionDelay = 0;
 				} else {
@@ -386,41 +389,68 @@ export function queue() {
 						pattern: "^(http|https)://([a-zA-Z0-9]+([-.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,})(/[a-zA-Z0-9_.-]*)*/?$",
 						maxLength: 2048
 					}),
-					method: t.Union([
-						t.Literal("GET"),
-						t.Literal("POST"),
-						t.Literal("PATCH"),
-						t.Literal("PUT"),
-						t.Literal("DELETE")
-					], {
-						default: null
-					}),
-					body: t.Optional(
-						t.Record(
-							t.String({ minLength: 1, maxLength: 128 }),
-							t.Union([
+					method: t.Optional(
+						t.Union([
+							t.Literal("GET"),
+							t.Literal("POST"),
+							t.Literal("PATCH"),
+							t.Literal("PUT"),
+							t.Literal("DELETE")
+						], {
+							default: null
+						})
+					),
+					data: t.Optional(
+						t.Union([
+							t.String({
+								default: null,
+								minLength: 1,
+								maxLength: Number.MIN_SAFE_INTEGER
+							}),
+							t.Record(
 								t.String({
 									minLength: 1,
-									maxLength: Number.MAX_SAFE_INTEGER
+									maxLength: 128,
+									pattern: "^[a-zA-Z0-9\-\_\:\.]$"
 								}),
-								t.Number({
-									maximum: Number.MAX_SAFE_INTEGER
-								})
-							]), {
-								default: null
-							}
-						)
+								t.Union([
+									t.String({
+										minLength: 1,
+										maxLength: Number.MAX_SAFE_INTEGER
+									}),
+									t.Number({
+										maximum: Number.MAX_SAFE_INTEGER
+									})
+								]), {
+									default: null
+								}
+							)
+						])
 					),
 					query: t.Optional(
 						t.Record(
-							t.String({ minLength: 1, maxLength: 128 }),
-							t.String({ minLength: 1, maxLength: 4096 })
+							t.String({
+								minLength: 1,
+								maxLength: 128,
+								pattern: "^[a-zA-Z0-9\-\_\:\.]$"
+							}),
+							t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
 						)
 					),
 					headers: t.Optional(
 						t.Record(
-							t.String({ minLength: 1, maxLength: 128 }),
-							t.String({ minLength: 1, maxLength: 4096 }), {
+							t.String({
+								minLength: 1,
+								maxLength: 128,
+								pattern: "^[a-zA-Z0-9\-\_\:\.]$"
+							}),
+							t.String({
+								minLength: 1,
+								maxLength: 4096
+							}), {
 								default: null
 							}
 						)
@@ -605,27 +635,11 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 				let stateMs = 0;
 				return defer(() => fetchHttp(ctx.body, additionalHeaders)).pipe(
 					catchError((error: FetchRes) => {
-						if (error instanceof TimeoutError) {
-							return throwError(() => ({
-								data: null,
-								state: "ERROR",
-								status: 408,
-								statusText: "Request Timeout"
-							}));
+						const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == error.status);
+						if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatusCode) {
+							return throwError(() => error);
 						}
-						if ("status" in error) {
-							const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == error.status);
-							if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatusCode) {
-								return throwError(() => error);
-							}
-							return of(error);
-						}
-						return throwError(() => ({
-							data: null,
-							state: "UNKNOWN",
-							status: 500,
-							statusText: toString(error)
-						}));
+						return of(error);
 					}),
 					retry({
 						count: ctx.body.config.retry,
@@ -727,7 +741,7 @@ function registerQueue(ctx: SubscriptionContext) {
 		ctx.db.run("INSERT INTO config (id, url, method, timeout) VALUES (?1, ?2, ?3, ?4);", [
 			queueId,
 			encr(ctx.body.httpRequest.url, key),
-			ctx.body.httpRequest.method,
+			ctx.body.httpRequest.method || null,
 			ctx.body.config.timeout
 		]);
 		if (ctx.body.config.executeAt) {
@@ -741,10 +755,10 @@ function registerQueue(ctx: SubscriptionContext) {
 				queueId
 			]);
 		}
-		if (ctx.body.httpRequest.body) {
-			const strBody = JSON.stringify(ctx.body.httpRequest.body);
-			ctx.db.run("UPDATE config SET bodyStringify = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				encr(strBody, key),
+		if (ctx.body.httpRequest.data) {
+			const strData = JSON.stringify(ctx.body.httpRequest.data);
+			ctx.db.run("UPDATE config SET dataStringify = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
+				encr(strData, key),
 				queueId
 			]);
 		}
@@ -848,8 +862,8 @@ function transformQueue(db: Database, rQueue: ResumeQueueQuery, beforeAt: number
 		httpRequest: {
 			url: decr(rQueue.url, key),
 			method: rQueue.method,
-			body: !!rQueue.bodyStringify
-				? JSON.parse(decr(rQueue.bodyStringify, key))
+			body: !!rQueue.dataStringify
+				? JSON.parse(decr(rQueue.dataStringify, key))
 				: undefined,
 			query: !!rQueue.queryStringify
 				? JSON.parse(decr(rQueue.queryStringify, key))
