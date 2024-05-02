@@ -95,6 +95,10 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 	} else {
 		options.push("--http1.1");
 	}
+	// Insecure
+	if (req.config.insecure) {
+		options.push("-k");
+	}
 	// Referer URL
 	if (req.config.refererUrl) {
 		if (req.config.refererUrl == "AUTO") {
