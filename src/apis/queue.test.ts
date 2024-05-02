@@ -5,6 +5,7 @@ import { treaty } from "@elysiajs/eden";
 
 import { queue } from "./queue";
 import { subscriber } from "./subscriber";
+import { setPragma } from "../db";
 
 const subscriberApi = treaty(subscriber().listen(+env.PORT! || 3200));
 const queueApp = queue().listen(+env.PORT! || 3200)
@@ -16,6 +17,8 @@ let key = "";
 let id = "";
 
 describe("Test API", () => {
+	setPragma(db);
+
 	const stmtQ = db.prepare<void, string>("DELETE FROM queue WHERE subscriberId = ?;");
 	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE name = ?;");
 
@@ -23,21 +26,19 @@ describe("Test API", () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
-		await sleep(1);
 	});
-	afterEach(async () => {
+	afterEach(() => {
 		db.transaction(() => {
 			stmtQ.run(id);
 			stmtS.run(name);
 		})();
-		await sleep(1);
 	});
 
 	describe("GET /queues", () => {
 		it("should successfully get the queues", async () => {
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -67,11 +68,10 @@ describe("Test API", () => {
 			await sleep(1000);
 		});
 		it("should successfully get the queues with \"limit\" query", async () => {
-			for (let i = 0; i < 5; i++) {
-				const tId = i + 1;
+			for (let i = 1; i <= 5; i++) {
 				const { data, status } = await queueApi.queues.register.post({
 					httpRequest: {
-						url: "https://dummyjson.com/todos/" + tId.toString(),
+						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 						method: "GET"
 					},
 					config: {
@@ -101,11 +101,10 @@ describe("Test API", () => {
 			await sleep(1000);
 		});
 		it("should successfully get the queues with \"offset\" query", async () => {
-			for (let i = 0; i < 5; i++) {
-				const tId = i + 1;
+			for (let i = 1; i <= 5; i++) {
 				const { data, status } = await queueApi.queues.register.post({
 					httpRequest: {
-						url: "https://dummyjson.com/todos/" + tId.toString(),
+						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 						method: "GET"
 					},
 					config: {
@@ -141,7 +140,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -156,6 +155,8 @@ describe("Test API", () => {
 			});
 			expect(status).toBe(201);
 			expect(data?.id).toBeDefined();
+			// Waiting for task
+			await sleep(dueTime * 2);
 			const queue = await queueApi.queues({ id: data?.id! }).get({
 				headers: {
 					"authorization": "Bearer " + key,
@@ -164,8 +165,6 @@ describe("Test API", () => {
 			});
 			expect(queue.status).toBe(200);
 			expect(queue.data?.id).toBeDefined();
-			// Waiting for task
-			await sleep(dueTime + 1000);
 		});
 	});
 
@@ -174,7 +173,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -201,7 +200,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/0",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb/error",
 					method: "GET"
 				},
 				config: {
@@ -232,7 +231,7 @@ describe("Test API", () => {
 			setSystemTime();
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -257,7 +256,7 @@ describe("Test API", () => {
 			setSystemTime();
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -278,7 +277,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -297,7 +296,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/0",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb/error",
 					method: "GET"
 				},
 				config: {
@@ -318,7 +317,8 @@ describe("Test API", () => {
 			// Wait for tasks
 			await sleep((dueTime * 3) + dueTime);
 			// ...
-			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT q.state, c.retryCount FROM queue AS q INNER JOIN config AS c ON q.id = c.id WHERE q.id = ?;");
+			const q = db.query<Pick<QueueTable, "state"> & Pick<ConfigTable, "retryCount">, string>("SELECT state, (SELECT retryCount FROM config WHERE id = ?1) AS retryCount FROM queue WHERE id = ?1;");
+			await sleep((dueTime * 3) + dueTime);
 			const value = q.get(data?.id!);
 			expect(value?.state).toBe("ERROR");
 			expect(value?.retryCount).toBe(3);
@@ -330,7 +330,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -367,7 +367,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -425,7 +425,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -459,7 +459,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -495,7 +495,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {
@@ -532,7 +532,7 @@ describe("Test API", () => {
 			const dueTime = 1000;
 			const { data, status } = await queueApi.queues.register.post({
 				httpRequest: {
-					url: "https://dummyjson.com/todos/1",
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 					method: "GET"
 				},
 				config: {

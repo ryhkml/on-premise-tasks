@@ -86,17 +86,32 @@ interface TaskSubscriberRequest {
     config?: TasksConfig;
 }
 
+type PlainTextData = string
+type MultipartFormData = {
+    name: string;
+    value: string;
+}
+type ApplicationJsonData = {
+    [key: string]: string | number;
+}
+
 interface TasksHttp {
     url: string;
     method?: "GET" | "POST" | "DELETE" | "PATCH" | "PUT";
-    data?: string | {
-        [key: string]: string | number;
-    };
+    data?: PlainTextData | Array<MultipartFormData> | ApplicationJsonData;
     query?: {
         [key: string]: string;
     };
+    cookie?: Array<{
+        name: string;
+        value: string;
+    }>;
     headers?: {
         [key: string]: string;
+    };
+    authBasic?: {
+        user: string;
+        password: string;
     };
 }
 
@@ -109,6 +124,23 @@ interface TasksConfig {
     retryStatusCode?: Array<number>; // Default []
     retryExponential?: boolean; // Default true
     timeout?: number; // Default 30000ms, min: 1000ms, max: 3600000ms
+    //
+    // The configuration below refers to the curl options. (not all options are supported)
+    // Visit https://curl.se/docs/manpage.html for more information
+    //
+    dnsServer?: Array<string> | null;
+    dohInsecure?: boolean;
+    dohUrl?: string | null;
+    httpVersion?: "0.9" | "1.0" | "1.1" | "2";
+    insecure?: boolean;
+    refererUrl?: string | "AUTO" | null;
+    redirectAttempts?: number;
+    keepAliveDuration?: number;
+    resolve?: Array<{
+        host: string;
+        port: number;
+        address: Array<string>;
+    }> | null;
 }
 ```
 An example of requesting a Task

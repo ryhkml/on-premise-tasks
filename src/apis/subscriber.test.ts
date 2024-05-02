@@ -1,9 +1,10 @@
-import { env, sleep } from "bun";
+import { env } from "bun";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { treaty } from "@elysiajs/eden";
 
 import { subscriber } from "./subscriber";
+import { setPragma } from "../db";
 
 const subscriberApp = subscriber().listen(+env.PORT! || 3200);
 const subscriberApi = treaty(subscriberApp);
@@ -14,17 +15,17 @@ let key = "";
 let id = "";
 
 describe("Test API", () => {
+	setPragma(db);
+
 	const stmtS = db.prepare<void, string>("DELETE FROM subscriber WHERE name = ?;");
 
 	beforeEach(async () => {
 		const { data } = await subscriberApi.subscribers.register.post({ name });
 		key = data?.key!;
 		id = data?.id!;
-		await sleep(1);
 	});
-	afterEach(async () => {
+	afterEach(() => {
 		stmtS.run(name);
-		await sleep(1);
 	});
 
 	describe("GET /subscribers/:name", () => {

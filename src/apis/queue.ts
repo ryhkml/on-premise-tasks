@@ -10,7 +10,7 @@ import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeco
 import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
 import { isPlainObject, kebabCase, toSafeInteger, toString } from "lodash";
 
-import { fetchHttp } from "../utils/fetch";
+import { http } from "../utils/http";
 import { pluginAuth } from "../plugins/auth";
 import { pluginContentLength } from "../plugins/content-length";
 import { decr, encr } from "../utils/crypto";
@@ -55,7 +55,16 @@ export function queue() {
 			retryInterval: 0,
 			retryStatusCode: [] as Array<number>,
 			retryExponential: true,
-			timeout: 30000
+			timeout: 30000,
+			dnsServer: null,
+			dohInsecure: false,
+			dohUrl: null,
+			httpVersion: "1.1",
+			insecure: false,
+			keepAliveDuration: 30,
+			redirectAttempts: 8,
+			refererUrl: null,
+			resolve: null
 		})
 		.decorate("subject", new BehaviorSubject(null))
 		// Get queues
@@ -319,10 +328,10 @@ export function queue() {
 					...ctx.body.config
 				};
 				if (ctx.body.httpRequest.method) {
+					ctx.body.httpRequest.method = ctx.body.httpRequest.method.toUpperCase() as HttpMethod;
 					if (ctx.body.httpRequest.data && (ctx.body.httpRequest.method == "GET" || ctx.body.httpRequest.method == "DELETE")) {
 						ctx.body.httpRequest.data = undefined;
 					}
-					ctx.body.httpRequest.method = ctx.body.httpRequest.method.toUpperCase() as HttpMethod;
 				}
 				if (ctx.body.config.executeAt) {
 					ctx.body.config.executionDelay = 0;
@@ -338,6 +347,17 @@ export function queue() {
 				}
 				if (ctx.body.config.retry == 1) {
 					ctx.body.config.retryExponential = false;
+				}
+				if (ctx.body.config.dohUrl) {
+					ctx.body.config.dohUrl = new URL(ctx.body.config.dohUrl).toString();
+				}
+				if (ctx.body.config.refererUrl) {
+					if (ctx.body.config.refererUrl.toUpperCase() == "AUTO") {
+						ctx.body.config.refererUrl = ctx.body.config.refererUrl.toUpperCase();
+					}
+					if (ctx.body.config.refererUrl != "AUTO") {
+						ctx.body.config.refererUrl = new URL(ctx.body.config.refererUrl).toString();
+					}
 				}
 			},
 			beforeHandle(ctx) {
@@ -402,11 +422,32 @@ export function queue() {
 					),
 					data: t.Optional(
 						t.Union([
+							// Plain text
 							t.String({
 								default: null,
 								minLength: 1,
 								maxLength: Number.MIN_SAFE_INTEGER
 							}),
+							// Form
+							t.Array(
+								t.Object({
+									name: t.String({
+										minLength: 1,
+										maxLength: 128,
+										pattern: "^[a-zA-Z0-9\-\_\:\.]$"
+									}),
+									value: t.String({
+										minLength: 1,
+										maxLength: Number.MAX_SAFE_INTEGER
+									})
+								}),
+								{
+									default: null,
+									minItems: 1,
+									maxItems: 4096
+								}
+							),
+							// Json
 							t.Record(
 								t.String({
 									minLength: 1,
@@ -418,11 +459,11 @@ export function queue() {
 										minLength: 1,
 										maxLength: Number.MAX_SAFE_INTEGER
 									}),
-									t.Number({
-										maximum: Number.MAX_SAFE_INTEGER
-									})
+									t.Number()
 								]), {
-									default: null
+									default: null,
+									maxProperties: 1,
+									minProperties: Number.MAX_SAFE_INTEGER
 								}
 							)
 						])
@@ -437,7 +478,32 @@ export function queue() {
 							t.String({
 								minLength: 1,
 								maxLength: 4096
-							})
+							}),
+							{
+								minProperties: 1,
+								maxProperties: Number.MAX_SAFE_INTEGER
+							}
+						)
+					),
+					cookie: t.Optional(
+						t.Array(
+							t.Object({
+								name: t.String({
+									minLength: 1,
+									maxLength: 128,
+									pattern: "^[a-zA-Z0-9\-\_\:\.]$"
+								}),
+								value: t.String({
+									minLength: 1,
+									maxLength: 4096
+								})
+							}),
+							{
+								default: null,
+								minItems: 1,
+								maxItems: 4096,
+								uniqueItems: true
+							}
 						)
 					),
 					headers: t.Optional(
@@ -451,9 +517,25 @@ export function queue() {
 								minLength: 1,
 								maxLength: 4096
 							}), {
-								default: null
+								default: null,
+								minProperties: 1,
+								maxProperties: Number.MAX_SAFE_INTEGER
 							}
 						)
+					),
+					authBasic: t.Optional(
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}, {
+							default: null
+						})
 					)
 				}),
 				config: t.Object({
@@ -470,7 +552,7 @@ export function queue() {
 					retry: t.Integer({
 						default: 0,
 						minimum: 0,
-						maximum: 4096
+						maximum: Number.MAX_SAFE_INTEGER
 					}),
 					retryAt: t.Integer({
 						default: 0,
@@ -489,7 +571,8 @@ export function queue() {
 						}), {
 							default: [],
 							minItems: 0,
-							maxItems: 40
+							maxItems: 40,
+							uniqueItems: true
 						}
 					),
 					retryExponential: t.Boolean({
@@ -499,6 +582,100 @@ export function queue() {
 						default: 30000,
 						minimum: 1000,
 						maximum: 3600000
+					}),
+					dnsServer: t.Union([
+						t.Array(
+							t.String({
+								format: "ipv4"
+							}),
+							{
+								default: null,
+								minItems: 1,
+								maxItems: 4,
+								uniqueItems: true
+							}
+						),
+						t.Null()
+					], {
+						default: null
+					}),
+					dohUrl: t.Union([
+						t.String({
+							pattern: "^https?:\/\/(\w+(-\w+)*)(\.(\w+(-\w+)*))*(\.\w{2,})\/dns-query$"
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					dohInsecure: t.Boolean({
+						default: false
+					}),
+					httpVersion: t.Union([
+						t.Literal("0.9"),
+						t.Literal("1.0"),
+						t.Literal("1.1"),
+						t.Literal("2")
+					], {
+						default: "1.1"
+					}),
+					insecure: t.Boolean({
+						default: false
+					}),
+					refererUrl: t.Union([
+						t.String({
+							pattern: "^(http|https)://([a-zA-Z0-9]+([-.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,})(/[a-zA-Z0-9_.-]*)*/?$",
+							maxLength: 2048
+						}),
+						t.Literal("AUTO"),
+						t.Null()
+					], {
+						default: null
+					}),
+					redirectAttempts: t.Integer({
+						default: 8,
+						minimum: 0,
+						maximum: 64
+					}),
+					keepAliveDuration: t.Integer({
+						default: 30,
+						minimum: 0,
+						maximum: 259200
+					}),
+					resolve: t.Union([
+						t.Array(
+							t.Object({
+								host: t.Union([
+									t.String({
+										pattern: "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$"
+									}),
+									t.Literal("*")
+								]),
+								port: t.Integer({
+									minimum: 1,
+									maximum: 65535
+								}),
+								address: t.Array(
+									t.String({
+										format: "ipv4"
+									}),
+									{
+										default: null,
+										minItems: 1,
+										maxItems: 8,
+										uniqueItems: true
+									}
+								)
+							}),
+							{
+								default: null,
+								minItems: 1,
+								maxItems: 128,
+								uniqueItems: true
+							}
+						),
+						t.Null()
+					], {
+						default: null
 					})
 				})
 			}),
@@ -626,14 +803,14 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 	const stmtQ = ctx.db.prepare<void, [string, number, Buffer, number, string]>("UPDATE queue SET state = ?1, statusCode = ?2, finalize = ?3, estimateEndAt = ?4 WHERE id = ?5 AND subscriberId IN (SELECT id FROM subscriber);");
 	const stmtC = ctx.db.prepare<Pick<ConfigTable, "retryCount" | "retryLimit">, string>("UPDATE config SET retrying = 1 WHERE id = ? AND id IN (SELECT id FROM queue) RETURNING retryCount, retryLimit;");
 	const stmtQErr = ctx.db.prepare<void, [number, Buffer, string]>("UPDATE queue SET statusCode = ?1, finalize = ?2 WHERE id = ?3 AND subscriberId IN (SELECT id FROM subscriber);");
-	const stmtCErr = ctx.db.prepare<void, [string, number, string]>("UPDATE config SET headersStringify = ?1, estimateNextRetryAt = ?2 WHERE id = ?3 AND id IN (SELECT id FROM queue);");
+	const stmtCErr = ctx.db.prepare<void, [string, number, string]>("UPDATE config SET headers = ?1, estimateNextRetryAt = ?2 WHERE id = ?3 AND id IN (SELECT id FROM queue);");
 	ctx.store.queues.push({
 		id: queueId,
 		subscription: timer(dueTime).pipe(
 			switchMap(() => {
 				let additionalHeaders = {} as { [k: string]: string };
 				let stateMs = 0;
-				return defer(() => fetchHttp(ctx.body, additionalHeaders)).pipe(
+				return defer(() => http(ctx.body, additionalHeaders)).pipe(
 					catchError((error: FetchRes) => {
 						const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == error.status);
 						if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatusCode) {
@@ -731,6 +908,113 @@ function registerQueue(ctx: SubscriptionContext) {
 		? addMilliseconds(ctx.today, dueTime).getTime()
 		: dueTime.getTime();
 	pushSubscription(ctx, dueTime, queueId);
+	let raw = "UPDATE config SET";
+	const rawBindings = [] as Array<string | number>;
+	if (ctx.body.httpRequest.method) {
+		raw += " method = ?,";
+		rawBindings.push(ctx.body.httpRequest.method);
+	}
+	if (ctx.body.config.executeAt) {
+		raw += " executeAt = ?,";
+		rawBindings.push(ctx.body.config.executeAt);
+	} else {
+		raw += " executionDelay = ?,";
+		rawBindings.push(ctx.body.config.executionDelay);
+	}
+	if (ctx.body.httpRequest.data) {
+		raw += " data = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.data), key)
+		);
+	}
+	if (ctx.body.httpRequest.query) {
+		raw += " query = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.query), key)
+		);
+	}
+	if (ctx.body.httpRequest.cookie) {
+		raw += " cookie = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.cookie), key)
+		);
+	}
+	if (ctx.body.httpRequest.headers) {
+		raw += " headers = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.headers), key)
+		);
+	}
+	if (ctx.body.httpRequest.authBasic) {
+		raw += " authBasic = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.authBasic), key)
+		);
+	}
+	if (ctx.body.config.retryAt) {
+		raw += " retry = 1, retryAt = ?, retryLimit = 1, retryExponential = 0,";
+		rawBindings.push(ctx.body.config.retryAt);
+	} else {
+		const retryExponential = ctx.body.config.retryExponential ? 1 : 0;
+		raw += " retry = ?, retryLimit = ?, retryInterval = ?, retryExponential = ?,";
+		rawBindings.push(ctx.body.config.retry);
+		rawBindings.push(ctx.body.config.retry);
+		rawBindings.push(ctx.body.config.retryInterval);
+		rawBindings.push(retryExponential);
+	}
+	if (ctx.body.config.retryStatusCode.length) {
+		raw += " retryStatusCode = ?,";
+		rawBindings.push(JSON.stringify(ctx.body.config.retryStatusCode));
+	}
+	if (ctx.body.config.timeout != 30000) {
+		raw += " timeout = ?,";
+		rawBindings.push(ctx.body.config.timeout);
+	}
+	if (ctx.body.config.dnsServer) {
+		raw += " dnsServer = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.dnsServer), key)
+		);
+	}
+	if (ctx.body.config.dohUrl) {
+		raw += " dohUrl = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.dohUrl), key)
+		);
+	}
+	if (ctx.body.config.dohInsecure) {
+		raw += " dohInsecure = 1,";
+	}
+	if (ctx.body.config.httpVersion != "1.1") {
+		raw += " httpVersion = ?,";
+		rawBindings.push(ctx.body.config.httpVersion);
+	}
+	if (ctx.body.config.insecure) {
+		raw += " insecure = 1,";
+	}
+	if (ctx.body.config.refererUrl) {
+		raw += " refererUrl = ?,";
+		rawBindings.push(
+			encr(ctx.body.config.refererUrl, key)
+		);
+	}
+	if (ctx.body.config.redirectAttempts != 8) {
+		raw += " redirectAttempts = ?,";
+		rawBindings.push(ctx.body.config.redirectAttempts);
+	}
+	if (ctx.body.config.keepAliveDuration != 30) {
+		raw += " keepAliveDuration = ?,";
+		rawBindings.push(ctx.body.config.keepAliveDuration);
+	}
+	if (ctx.body.config.resolve) {
+		raw += " resolve = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.resolve), key)
+		);
+	}
+	raw = raw.substring(0, raw.length - 1);
+	raw += " WHERE id = ? AND id IN (SELECT id FROM queue);";
+	rawBindings.push(queueId);
 	ctx.db.transaction(() => {
 		ctx.db.run("INSERT INTO queue (id, subscriberId, createdAt, estimateExecutionAt) VALUES (?1, ?2, ?3, ?4);", [
 			queueId,
@@ -738,65 +1022,11 @@ function registerQueue(ctx: SubscriptionContext) {
 			ctx.today,
 			estimateExecutionAt
 		]);
-		ctx.db.run("INSERT INTO config (id, url, method, timeout) VALUES (?1, ?2, ?3, ?4);", [
+		ctx.db.run("INSERT INTO config (id, url) VALUES (?1, ?2);", [
 			queueId,
-			encr(ctx.body.httpRequest.url, key),
-			ctx.body.httpRequest.method || null,
-			ctx.body.config.timeout
+			encr(ctx.body.httpRequest.url, key)
 		]);
-		if (ctx.body.config.executeAt) {
-			ctx.db.run("UPDATE config SET executeAt = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				ctx.body.config.executeAt,
-				queueId
-			]);
-		} else {
-			ctx.db.run("UPDATE config SET executionDelay = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				ctx.body.config.executionDelay,
-				queueId
-			]);
-		}
-		if (ctx.body.httpRequest.data) {
-			const strData = JSON.stringify(ctx.body.httpRequest.data);
-			ctx.db.run("UPDATE config SET dataStringify = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				encr(strData, key),
-				queueId
-			]);
-		}
-		if (ctx.body.httpRequest.query) {
-			const strQuery = JSON.stringify(ctx.body.httpRequest.query);
-			ctx.db.run("UPDATE config SET queryStringify = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				encr(strQuery, key),
-				queueId
-			]);
-		}
-		if (ctx.body.httpRequest.headers) {
-			const strHeaders = JSON.stringify(ctx.body.httpRequest.headers);
-			ctx.db.run("UPDATE config SET headersStringify = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				encr(strHeaders, key),
-				queueId
-			]);
-		}
-		if (ctx.body.config.retryAt) {
-			ctx.db.run("UPDATE config SET retry = 1, retryAt = ?1, retryLimit = 1, retryExponential = 0 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				ctx.body.config.retryAt,
-				queueId
-			]);
-		}
-		if (ctx.body.config.retry) {
-			const retryExponential = ctx.body.config.retryExponential ? 1 : 0;
-			ctx.db.run("UPDATE config SET retry = ?1, retryLimit = ?1, retryInterval = ?2, retryExponential = ?3 WHERE id = ?4 AND id IN (SELECT id FROM queue);", [
-				ctx.body.config.retry,
-				ctx.body.config.retryInterval,
-				retryExponential,
-				queueId
-			]);
-		}
-		if (ctx.body.config.retryStatusCode.length) {
-			ctx.db.run("UPDATE config SET retryStatusCode = ?1 WHERE id = ?2 AND id IN (SELECT id FROM queue);", [
-				JSON.stringify(ctx.body.config.retryStatusCode),
-				queueId
-			]);
-		}
+		ctx.db.run(raw, rawBindings);
 	})();
 	return {
 		id: queueId,
@@ -855,61 +1085,84 @@ function getQueues(db: Database, id: string, order: QueuesOrder = "createdAt", b
 	return queues;
 }
 
-function transformQueue(db: Database, rQueue: ResumeQueueQuery, beforeAt: number, terminated = false) {
+function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, terminated = false) {
 	const transformAt = Date.now();
-	const key = genKey(rQueue.id);
+	const key = genKey(rq.id);
 	const body = {
 		httpRequest: {
-			url: decr(rQueue.url, key),
-			method: rQueue.method,
-			body: !!rQueue.dataStringify
-				? JSON.parse(decr(rQueue.dataStringify, key))
+			url: decr(rq.url, key),
+			method: rq.method,
+			data: !!rq.data
+				? JSON.parse(decr(rq.data, key))
 				: undefined,
-			query: !!rQueue.queryStringify
-				? JSON.parse(decr(rQueue.queryStringify, key))
+			query: !!rq.query
+				? JSON.parse(decr(rq.query, key))
 				: undefined,
-			headers: !!rQueue.headersStringify
-				? JSON.parse(decr(rQueue.headersStringify, key))
+			cookie: !!rq.cookie
+				? JSON.parse(decr(rq.cookie, key))
+				: undefined,
+			headers: !!rq.headers
+				? JSON.parse(decr(rq.headers, key))
+				: undefined,
+			authBasic: !!rq.authBasic
+				? JSON.parse(decr(rq.authBasic, key))
 				: undefined
 		},
 		config: {
-			executionDelay: rQueue.executionDelay,
-			executeAt: rQueue.executeAt,
-			retry: rQueue.retry,
-			retryAt: rQueue.retryAt,
-			retryInterval: rQueue.retryInterval,
-			retryStatusCode: JSON.parse(rQueue.retryStatusCode),
-			retryExponential: !!rQueue.retryExponential,
-			timeout: rQueue.timeout
+			executionDelay: rq.executionDelay,
+			executeAt: rq.executeAt,
+			retry: rq.retry,
+			retryAt: rq.retryAt,
+			retryInterval: rq.retryInterval,
+			retryStatusCode: JSON.parse(rq.retryStatusCode),
+			retryExponential: !!rq.retryExponential,
+			timeout: rq.timeout,
+			dnsServer: !!rq.dnsServer
+				? JSON.parse(decr(rq.dnsServer, key))
+				: null,
+			dohUrl: !!rq.dohUrl
+				? decr(rq.dohUrl, key)
+				: null,
+			dohInsecure: !!rq.dohInsecure,
+			httpVersion: rq.httpVersion,
+			insecure: !!rq.insecure,
+			refererUrl: !!rq.refererUrl
+				? decr(rq.refererUrl, key)
+				: null,
+			redirectAttempts: rq.redirectAttempts,
+			keepAliveDuration: rq.keepAliveDuration,
+			resolve: !!rq.resolve
+				? JSON.parse(decr(rq.resolve, key))
+				: null
 		}
 	} as TaskSubscriberReq;
-	if (rQueue.executeAt) {
-		if (rQueue.retrying) {
-			if (rQueue.retryAt == 0) {
-				body.config.retry = rQueue.retryLimit - rQueue.retryCount;
+	if (rq.executeAt) {
+		if (rq.retrying) {
+			if (rq.retryAt == 0) {
+				body.config.retry = rq.retryLimit - rq.retryCount;
 			}
 			const delay = Math.abs(
-				differenceInMilliseconds(rQueue.estimateNextRetryAt, beforeAt)
+				differenceInMilliseconds(rq.estimateNextRetryAt, beforeAt)
 			);
 			body.config.executeAt = addMilliseconds(transformAt, delay).getTime();
 		} else {
 			const diffMs = Math.abs(
-				differenceInMilliseconds(rQueue.estimateExecutionAt, beforeAt)
+				differenceInMilliseconds(rq.estimateExecutionAt, beforeAt)
 			);
 			body.config.executeAt = addMilliseconds(transformAt, diffMs).getTime();
 		}
 	} else {
-		if (rQueue.retrying) {
-			if (rQueue.retryAt == 0) {
-				body.config.retry = rQueue.retryLimit - rQueue.retryCount;
+		if (rq.retrying) {
+			if (rq.retryAt == 0) {
+				body.config.retry = rq.retryLimit - rq.retryCount;
 			}
 			const delay = Math.abs(
-				differenceInMilliseconds(rQueue.estimateNextRetryAt, beforeAt)
+				differenceInMilliseconds(rq.estimateNextRetryAt, beforeAt)
 			);
 			body.config.executionDelay = delay;
 		} else {
 			const diffMs = Math.abs(
-				differenceInMilliseconds(rQueue.estimateExecutionAt, beforeAt)
+				differenceInMilliseconds(rq.estimateExecutionAt, beforeAt)
 			);
 			body.config.executionDelay = diffMs;
 		}
@@ -923,12 +1176,12 @@ function transformQueue(db: Database, rQueue: ResumeQueueQuery, beforeAt: number
 	if (!terminated) {
 		db.run("UPDATE queue SET state = 'RUNNING', estimateEndAt = 0, estimateExecutionAt = ?1 WHERE id = ?2 AND subscriberId IN (SELECT id FROM subscriber);", [
 			estimateExecutionAt,
-			rQueue.id
+			rq.id
 		]);
 	}
 	return {
-		subscriberId: rQueue.subscriberId,
-		id: rQueue.id,
+		subscriberId: rq.subscriberId,
+		id: rq.id,
 		dueTime: resumeDueTime,
 		body
 	};
