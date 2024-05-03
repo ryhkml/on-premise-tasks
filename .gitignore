@@ -23,6 +23,9 @@ note.txt
 .env
 .env.*
 
+# Output
+/target
+
 # debug
 npm-debug.log*
 yarn-debug.log*
