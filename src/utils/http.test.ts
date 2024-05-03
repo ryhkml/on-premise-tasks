@@ -6,6 +6,15 @@ import { lastValueFrom } from "rxjs";
 import { http } from "./http";
 
 describe("Test FETCH", () => {
+	describe("Curl availability", () => {
+		it("should successfully show version", async () => {
+			const text = await $`curl -V`.text();
+			expect(text).toMatch("Release-Date:");
+			expect(text).toMatch("Protocols:");
+			expect(text).toMatch("Features:");
+		});
+	});
+
 	describe("Main request-response", () => {
 		it("should respond to \"FetchRes\" if the http request is successful", async () => {
 			const result = await lastValueFrom(
