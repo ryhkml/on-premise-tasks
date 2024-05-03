@@ -141,6 +141,20 @@ interface TasksConfig {
         port: number;
         address: Array<string>;
     }> | null;
+    proxy: {
+        protocol: "http" | "https";
+        host: string;
+        port?: number;
+    } | null;
+    proxyAuthBasic: {
+        user: string;
+        password: string;
+    } | null;
+    proxyHeaders: {
+        [key: string]: string;
+    } | null;
+    proxyHttpVersion: "1.0" | "1.1";
+    proxyInsecure: boolean;
 }
 ```
 An example of requesting a Task

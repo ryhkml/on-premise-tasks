@@ -28,6 +28,11 @@ CREATE TABLE config (
 	redirectAttempts		INTEGER NULL DEFAULT 8,
 	keepAliveDuration		INTEGER NULL DEFAULT 30,
 	resolve					TEXT NULL,
+	proxy					TEXT NULL,
+	proxyAuthBasic			TEXT NULL,
+	proxyHeaders			TEXT NULL,
+	proxyHttpVersion		TEXT NULL DEFAULT '1.1',
+	proxyInsecure			TEXT NULL,
 	FOREIGN KEY (id) REFERENCES queue(id)
 );
 

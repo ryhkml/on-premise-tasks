@@ -64,7 +64,12 @@ export function queue() {
 			keepAliveDuration: 30,
 			redirectAttempts: 8,
 			refererUrl: null,
-			resolve: null
+			resolve: null,
+			proxy: null,
+			proxyAuthBasic: null,
+			proxyHeaders: null,
+			proxyHttpVersion: "1.1",
+			proxyInsecure: false
 		})
 		.decorate("subject", new BehaviorSubject(null))
 		// Get queues
@@ -676,6 +681,78 @@ export function queue() {
 						t.Null()
 					], {
 						default: null
+					}),
+					proxy: t.Union([
+						t.Object({
+							protocol: t.Union([
+								t.Literal("http"),
+								t.Literal("https")
+							]),
+							host: t.Union([
+								t.String({
+									format: "ipv4"
+								}),
+								t.String({
+									pattern: "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$",
+									maxLength: 2048
+								})
+							]),
+							port: t.Optional(
+								t.Integer({
+									minimum: 1,
+									maximum: 65535
+								})
+							)
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					proxyAuthBasic: t.Union([
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}, {
+							default: null
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					proxyHeaders: t.Union([
+						t.Record(
+							t.String({
+								minLength: 1,
+								maxLength: 128,
+								pattern: "^[a-zA-Z0-9\-\_\:\.]$"
+							}),
+							t.String({
+								minLength: 1,
+								maxLength: 4096
+							}), {
+								default: null,
+								minProperties: 1,
+								maxProperties: Number.MAX_SAFE_INTEGER
+							}
+						),
+						t.Null()
+					], {
+						default: null
+					}),
+					proxyHttpVersion: t.Union([
+						t.Literal("1.0"),
+						t.Literal("1.1")
+					], {
+						default: "1.1"
+					}),
+					proxyInsecure: t.Boolean({
+						default: false
 					})
 				})
 			}),
@@ -1012,6 +1089,29 @@ function registerQueue(ctx: SubscriptionContext) {
 			encr(JSON.stringify(ctx.body.config.resolve), key)
 		);
 	}
+	if (ctx.body.config.proxy) {
+		raw += " proxy = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.proxy), key)
+		);
+	}
+	if (ctx.body.config.proxyAuthBasic) {
+		raw += " proxyAuthBasic = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.proxyAuthBasic), key)
+		);
+	}
+	if (ctx.body.config.proxyHeaders) {
+		raw += " proxyHeaders = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.proxyHeaders), key)
+		);
+	}
+	raw += " proxyHttpVersion = ?,";
+	rawBindings.push(ctx.body.config.proxyHttpVersion);
+	if (ctx.body.config.proxyInsecure) {
+		raw += " proxyInsecure = 1,";
+	}
 	raw = raw.substring(0, raw.length - 1);
 	raw += " WHERE id = ? AND id IN (SELECT id FROM queue);";
 	rawBindings.push(queueId);
@@ -1133,7 +1233,18 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			keepAliveDuration: rq.keepAliveDuration,
 			resolve: !!rq.resolve
 				? JSON.parse(decr(rq.resolve, key))
-				: null
+				: null,
+			proxy: !!rq.proxy
+				? JSON.parse(decr(rq.proxy, key))
+				: null,
+			proxyAuthBasic: !!rq.proxyAuthBasic
+				? JSON.parse(decr(rq.proxyAuthBasic, key))
+				: null,
+			proxyHeaders: !!rq.proxyAuthBasic
+				? JSON.parse(decr(rq.proxyAuthBasic, key))
+				: null,
+			proxyHttpVersion: rq.proxyHttpVersion,
+			proxyInsecure: !!rq.proxyInsecure
 		}
 	} as TaskSubscriberReq;
 	if (rq.executeAt) {

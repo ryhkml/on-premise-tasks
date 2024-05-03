@@ -58,6 +58,12 @@ declare global {
 		address: Array<string>;
 	}
 
+	type ProxyProvider = {
+		protocol: "http" | "https";
+		host: string;
+		port?: number;
+	}
+
 	interface TaskConfig {
 		executionDelay: number;
 		executeAt: number;
@@ -90,6 +96,18 @@ declare global {
 		redirectAttempts: number;
 		keepAliveDuration: number;
 		resolve: Array<ResolveProvider> | null;
+		proxy: ProxyProvider | null;
+		proxyAuthBasic: AuthBasic | null;
+		proxyHeaders: ObjectStrData | null;
+		proxyHttpVersion: Exclude<HttpVersion, "0.9" | "2">;
+		/**
+		 * WARNING
+		 *
+		 * Using this option makes the transfer to the proxy insecure
+		 *
+		 * @default false
+		*/
+		proxyInsecure: boolean;
 	}
 
 	type TaskState = "DONE" | "ERROR" | "PAUSED" | "RUNNING";
@@ -211,6 +229,12 @@ declare global {
 		 * `resolve` property must be decrypt first and then parse into an array string
 		*/
 		resolve: string | null;
+		//
+		proxy: string | null;
+		proxyAuthBasic: string | null;
+		proxyHeaders: string | null;
+		proxyHttpVersion: string;
+		proxyInsecure: number;
 	}
 
 	type FetchRes = {

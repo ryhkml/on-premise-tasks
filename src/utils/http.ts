@@ -138,6 +138,38 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push(resolve);
 		}
 	}
+	// Proxy
+	if (req.config.proxy) {
+		if (req.config.proxyHttpVersion == "1.0") {
+			options.push("--proxy1.0");
+		} else {
+			options.push("-x");
+		}
+		const { protocol, host, port } = req.config.proxy;
+		if (port && req.config.proxyHttpVersion == "1.1") {
+			options.push(protocol + "://" + host + ":" + port.toString());
+		} else {
+			options.push(protocol + "://" + host);
+		}
+		// Proxy auth basic
+		if (req.config.proxyAuthBasic) {
+			options.push("--proxy-basic");
+			options.push("-U");
+			const { user, password } = req.config.proxyAuthBasic;
+			options.push(user + ":" + password);
+		}
+		// Proxy headers
+		if (req.config.proxyHeaders) {
+			for (const [key, value] of Object.entries(req.config.proxyHeaders)) {
+				options.push("--proxy-header");
+				options.push(key.toLowerCase() + ": " + value);
+			}
+		}
+		// Proxy insecure
+		if (req.config.proxyInsecure) {
+			options.push("--proxy-insecure");
+		}
+	}
 	const url = !!req.httpRequest.query
 		? new URL(req.httpRequest.url + "?" + new URLSearchParams(req.httpRequest.query).toString()).toString()
 		: new URL(req.httpRequest.url).toString();
