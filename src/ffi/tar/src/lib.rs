@@ -31,24 +31,25 @@ fn compress_to_tar_gz<P: AsRef<Path>>(dir_path: P, output_tar_gz_path: P) -> io:
     let tar_gz_file = File::create(output_tar_gz_path)?;
     let tar_gz = GzEncoder::new(tar_gz_file, Compression::default());
     let mut tarball = Builder::new(tar_gz);
-    fn add_to_tarball(builder: &mut Builder<GzEncoder<File>>, path: &Path, base_path: &Path) -> io::Result<()> {
-        let metadata = std::fs::metadata(path)?;
-        if metadata.is_file() {
-            let mut file = File::open(path)?;
-            builder.append_file(base_path, &mut file)?;
-        } else if metadata.is_dir() {
-            for entry in std::fs::read_dir(path)? {
-                let entry = entry?;
-                let path = entry.path();
-                let new_base = base_path.join(entry.file_name());
-                add_to_tarball(builder, &path, &new_base)?;
-            }
-        }
-        Ok(())
-    }
     add_to_tarball(&mut tarball, dir_path.as_ref(), Path::new(""))?;
     tarball.into_inner()?.finish()?;
     Ok(())
+}
+
+fn add_to_tarball(builder: &mut Builder<GzEncoder<File>>, path: &Path, base_path: &Path) -> io::Result<()> {
+	let metadata = std::fs::metadata(path)?;
+	if metadata.is_file() {
+		let mut file = File::open(path)?;
+		builder.append_file(base_path, &mut file)?;
+	} else if metadata.is_dir() {
+		for entry in std::fs::read_dir(path)? {
+			let entry = entry?;
+			let path = entry.path();
+			let new_base = base_path.join(entry.file_name());
+			add_to_tarball(builder, &path, &new_base)?;
+		}
+	}
+	Ok(())
 }
 
 #[cfg(test)]
