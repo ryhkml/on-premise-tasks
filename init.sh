@@ -4,8 +4,10 @@ set -e
 
 # Must be installed bun
 bun -v
-# Must be installed rustc
-rustc --version
+# Must be installed rust
+rustup -V
+rustc -V
+cargo -V
 
 cat .env.example > .env.development
 echo ".env.development file has been created"

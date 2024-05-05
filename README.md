@@ -16,7 +16,7 @@ On-Premise Tasks is a managed execution service for task delivery or distributio
 3. Scheduling
 
 ## Getting Started
-Make sure you have [bun](https://bun.sh/docs/installation) and [rustc](https://www.rust-lang.org/tools/install) installed, then run:
+Make sure you have [bun](https://bun.sh/docs/installation) and [rustup](https://www.rust-lang.org/tools/install) installed, then run:
 ```bash
 ./init.sh
 ```
