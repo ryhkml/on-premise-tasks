@@ -1,4 +1,4 @@
-import { env, spawn } from "bun";
+import { spawn } from "bun";
 
 import { Observable, TimeoutError, catchError, map, throwError, timeout } from "rxjs";
 import { isArray, isPlainObject, toSafeInteger, toString } from "lodash";
@@ -242,7 +242,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 
 function curl(options: Array<string>) {
 	return new Observable<string>(observer => {
-		const proc = spawn(["curl", ...options], { env: env });
+		const proc = spawn(["curl", ...options], { env: {} });
 		new Response(proc.stdout).text()
 			.then(text => {
 				observer.next(text.trim());
