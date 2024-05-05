@@ -29,22 +29,32 @@ describe("Test BACKUP", () => {
 
 	if (env.BACKUP_METHOD_SQLITE == "LOCAL") {
 		describe("Local method", () => {
-			let tarFilename = "";
+			let tar: { [k: string]: string };
 
 			beforeAll(async () => {
-				tarFilename = await backupDb("LOCAL");
+				tar = await backupDb("LOCAL");
 			});
 			afterAll(async () => {
 				await $`rm -rf ${env.BACKUP_DIR_SQLITE}`;
 			});
 
 			it("should successfully backup the database file to another directory", async () => {
-				const isExistsBakDb = await file(env.BACKUP_DIR_SQLITE + tarFilename.substring(1)).exists();
+				const isExistsBakDb = await file(env.BACKUP_DIR_SQLITE + tar.output.substring(1)).exists();
 				expect(isExistsBakDb).toBe(true);
 			});
 			it("should successfully restore the database file from another directory", async () => {
-				await $`tar -xf ${tarFilename} --strip-components=1`.cwd(env.BACKUP_DIR_SQLITE!);
-				const pathSqlite = env.BACKUP_DIR_SQLITE + "/" + basename(env.PATH_SQLITE!);
+				let pathSqlite = "";
+				if (tar.method == "lib") {
+					await $`tar -xzf ${tar.output} --strip-components=1`.cwd(env.BACKUP_DIR_SQLITE!);
+					pathSqlite = env.BACKUP_DIR_SQLITE + "/" + basename(env.PATH_SQLITE!);
+				} else {
+					await $`tar -xzf ${tar.output}`.cwd(env.BACKUP_DIR_SQLITE!);
+					if (env.PATH_SQLITE!.startsWith(".")) {
+						pathSqlite = env.BACKUP_DIR_SQLITE + env.PATH_SQLITE!.substring(1);
+					} else {
+						pathSqlite = env.BACKUP_DIR_SQLITE + env.PATH_SQLITE!;
+					}
+				}
 				const db = new Database(pathSqlite);
 				expect(db.filename).toBe(pathSqlite);
 				const q1 = db.query<{ message: "Ok" }, []>("SELECT 'Ok' AS message;");
@@ -62,7 +72,7 @@ describe("Test BACKUP", () => {
 
 	if (env.BACKUP_METHOD_SQLITE == "GOOGLE_CLOUD_STORAGE") {
 		describe("Google Cloud Storage method", () => {
-			let tarFilename = "";
+			let tar: { [k: string]: string };
 			const storage = new Storage({
 				projectId: env.BACKUP_GCS_PROJECT_ID_SQLITE,
 				credentials: {
@@ -76,25 +86,35 @@ describe("Test BACKUP", () => {
 			const bucket = storage.bucket(env.BACKUP_BUCKET_NAME_SQLITE!);
 
 			beforeAll(async () => {
-				tarFilename = await backupDb("GOOGLE_CLOUD_STORAGE");
+				tar = await backupDb("GOOGLE_CLOUD_STORAGE");
 			});
 			afterAll(async () => {
 				await Promise.all([
-					bucket.file(env.BACKUP_BUCKET_DIR_SQLITE + tarFilename.substring(1)).delete(),
+					bucket.file(env.BACKUP_BUCKET_DIR_SQLITE + tar.output.substring(1)).delete(),
 					$`rm -rf ${env.BACKUP_DIR_SQLITE}`
 				]);
 			});
 
 			it("should successfully backup the database file to Google Cloud Storage", async () => {
-				const [exists] = await bucket.file(env.BACKUP_BUCKET_DIR_SQLITE + tarFilename.substring(1)).exists();
+				const [exists] = await bucket.file(env.BACKUP_BUCKET_DIR_SQLITE + tar.output.substring(1)).exists();
 				expect(exists).toBe(true);
 			});
 			it("should successfully restore the database file from Google Cloud Storage", async () => {
-				const downloadPathTar = env.BACKUP_DIR_SQLITE! + tarFilename.substring(1);
-				const [buffer] = await bucket.file(env.BACKUP_BUCKET_DIR_SQLITE + tarFilename.substring(1)).download();
-				await write(downloadPathTar, buffer);
-				await $`tar -xf ${tarFilename} --strip-components=1`.cwd(env.BACKUP_DIR_SQLITE!);
-				const pathSqlite = env.BACKUP_DIR_SQLITE + "/" + basename(env.PATH_SQLITE!);
+				const pathTarDownload = env.BACKUP_DIR_SQLITE! + tar.output.substring(1);
+				const [buffer] = await bucket.file(env.BACKUP_BUCKET_DIR_SQLITE + tar.output.substring(1)).download();
+				await write(pathTarDownload, buffer);
+				let pathSqlite = "";
+				if (tar.method == "lib") {
+					await $`tar -xzf ${tar.output} --strip-components=1`.cwd(env.BACKUP_DIR_SQLITE!);
+					pathSqlite = env.BACKUP_DIR_SQLITE + "/" + basename(env.PATH_SQLITE!);
+				} else {
+					await $`tar -xzf ${tar.output}`.cwd(env.BACKUP_DIR_SQLITE!);
+					if (env.PATH_SQLITE!.startsWith(".")) {
+						pathSqlite = env.BACKUP_DIR_SQLITE + env.PATH_SQLITE!.substring(1);
+					} else {
+						pathSqlite = env.BACKUP_DIR_SQLITE + env.PATH_SQLITE!;
+					}
+				}
 				const db = new Database(pathSqlite);
 				expect(db.filename).toBe(pathSqlite);
 				const q1 = db.query<{ message: "Ok" }, []>("SELECT 'Ok' AS message;");
