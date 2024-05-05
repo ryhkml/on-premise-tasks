@@ -16,7 +16,7 @@ On-Premise Tasks is a managed execution service for task delivery or distributio
 3. Scheduling
 
 ## Getting Started
-To get started with this app, simply paste this command into your terminal:
+Make sure you have [bun](https://bun.sh/docs/installation) and [rustc](https://www.rust-lang.org/tools/install) installed, then run:
 ```bash
 ./init.sh
 ```
@@ -48,7 +48,7 @@ NODE_ENV=production ./tasks
 To start the docker build, run:
 ```bash
 # Build
-docker compose -p <STACK_NAME> --env-file .env.production up -d --build
+docker compose -p <STACK_NAME> --env-file <ENV_FILE> up -d --build
 # Down
 docker compose -p <STACK_NAME> down
 ```
@@ -62,22 +62,22 @@ You can use absolute path or current working path, for example:
 "./db/tasks.db"
 ```
 
-## API
+## APIs
 ### Subscriber
-- `GET /subscribers/:name` ✅
-- `DELETE /subscribers/:name` ✅
-- `POST /subscribers/register` ✅
+- ✅ `GET /subscribers/:name`
+- ✅ `DELETE /subscribers/:name`
+- ✅ `POST /subscribers/register`
 
 ### Queue
-- `GET /queues` ✅
-- `GET /queues/:id` ✅
-- `PATCH /queues/:id` ❌
-- `DELETE /queues/:id` ✅
-- `GET /queues/:id/config` ❌
-- `PATCH /queues/:id/pause` ✅
-- `PATCH /queues/:id/resume` ✅
-- `PATCH /queues/:id/unsubscribe` ✅
-- `POST /queues/register` ✅
+- ✅ `GET /queues`
+- ✅ `GET /queues/:id`
+- ❌ `PATCH /queues/:id`
+- ✅ `DELETE /queues/:id`
+- ❌ `GET /queues/:id/config`
+- ✅ `PATCH /queues/:id/pause`
+- ✅ `PATCH /queues/:id/resume`
+- ✅ `PATCH /queues/:id/unsubscribe`
+- ✅ `POST /queues/register`
 
 ### Types
 ```ts
@@ -125,7 +125,7 @@ interface TasksConfig {
     retryExponential?: boolean; // Default true
     timeout?: number; // Default 30000ms, min: 1000ms, max: 3600000ms
     //
-    // The configuration below refers to the curl options. (not all options are supported)
+    // The configuration below refers to the curl options (not all options are supported)
     // Visit https://curl.se/docs/manpage.html for more information
     //
     dnsServer?: Array<string> | null;
