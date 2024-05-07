@@ -1,17 +1,14 @@
-import { env, file } from "bun";
-
-import { exit } from "node:process";
+import { env, Serve } from "bun";
 
 import { Elysia } from "elysia";
 import { cron, Patterns } from "@elysiajs/cron";
-import { catchError, defer, forkJoin, of, switchMap, take } from "rxjs";
+import { lastValueFrom } from "rxjs";
 import { toSafeInteger } from "lodash";
 
 import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
-import { connectivity } from "./utils/connectivity";
 import { backupDb } from "./utils/backup";
-import { setPragma } from "./db";
+import { startup } from "./startup";
 
 const app = new Elysia()
 	.headers({
@@ -55,58 +52,17 @@ const app = new Elysia()
 		}
 	}));
 
-connectivity().pipe(
-	switchMap(() => forkJoin([
-		defer(() => file(env.PATH_TLS_CERT!).text()).pipe(
-			catchError(() => of(""))
-		),
-		defer(() => file(env.PATH_TLS_KEY!).text()).pipe(
-			catchError(() => of(""))
-		),
-		defer(() => file(env.PATH_TLS_CA!).text()).pipe(
-			catchError(() => of(""))
-		),
-		defer(() => file(app.decorator.db.filename).exists()).pipe(
-			catchError(() => of(false))
-		)
-	])),
-	take(1)
-)
-.subscribe({
-	next([cert, key, ca, isDbExists]) {
-		console.log("\x1b[32mConnectivity ok!\x1b[0m");
-		if (!isDbExists) {
-			console.error("Database file not found");
-			exit(1);
-		} else {
-			setPragma(app.decorator.db);
-			console.log("\x1b[32mDatabase ok!\x1b[0m");
-		}
-		if (env.TZ != "UTC") {
-			console.error("Invalid time zone");
-			exit(1);
-		} else {
-			console.log("\x1b[32mTime zone ok!\x1b[0m");
-		}
-		if (env.CIPHER_KEY == null || env.CIPHER_KEY.trim() == "") {
-			console.error("Set the value of the CIPHER_KEY environment variable first");
-			exit(1);
-		}
-		app.listen({
-			maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST) || 32768,
-			port: toSafeInteger(env.PORT) || 3200,
-			cert: cert || undefined,
-			key: key || undefined,
-			ca: ca || undefined
-		});
-		if (app.server?.url.protocol == "https:") {
-			console.log("Secure server listening on", app.server?.url.origin);
-		} else {
-			console.log("Server listening on", app.server?.url.origin);
-		}
-	},
-	error(err) {
-		console.error(err);
-		exit(1);
-	}
-});
+const [cert, key, ca] = await lastValueFrom(
+	// @ts-ignore
+	startup(app)
+);
+
+const options: Partial<Serve> = {
+	maxRequestBodySize: toSafeInteger(env.MAX_SIZE_BODY_REQUEST) || 32768,
+	port: toSafeInteger(env.PORT) || 3200,
+	cert,
+	key,
+	ca
+};
+
+app.listen(options, server => console.log("Server listening on port", server.port));
