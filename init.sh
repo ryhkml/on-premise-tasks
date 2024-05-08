@@ -16,4 +16,5 @@ cat .env.example > .env.production
 echo ".env.production file has been created"
 
 bun install
+cargo build --release
 echo "Done!"
