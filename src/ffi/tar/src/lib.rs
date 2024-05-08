@@ -1,13 +1,14 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
-use std::fs::File;
-use std::io::{self};
-use std::path::Path;
-
+use std::{
+	ffi::CStr,
+	fs::File,
+	io::{self},
+	os::raw::c_char,
+	path::Path,
+};
+use flate2::{
+	write::GzEncoder, Compression,
+};
 use tar::Builder;
-
-use flate2::write::GzEncoder;
-use flate2::Compression;
 
 #[no_mangle]
 pub extern "C" fn compress_dir(dir_path: *const c_char, output_path: *const c_char) -> u8 {
@@ -15,15 +16,15 @@ pub extern "C" fn compress_dir(dir_path: *const c_char, output_path: *const c_ch
     let output_path = unsafe { CStr::from_ptr(output_path) };
     let dir_path_str = match dir_path.to_str() {
         Ok(s) => s,
-        Err(_) => return 0
+        Err(_) => return 0,
     };
     let output_path_str = match output_path.to_str() {
         Ok(s) => s,
-        Err(_) => return 0
+        Err(_) => return 0,
     };
     match compress_to_tar_gz(Path::new(dir_path_str), Path::new(output_path_str)) {
         Ok(_) => 1,
-        Err(_) => 0
+        Err(_) => 0,
     }
 }
 
@@ -66,9 +67,9 @@ mod tests {
         fs::create_dir_all(file2_path.parent().unwrap()).unwrap();
         File::create(file1_path).unwrap();
         File::create(file2_path).unwrap();
-        let output_file = dir.path().join("db.tar.gz");
+        let output_file = dir.path().join("db.bak.tar.gz");
         let result = compress_to_tar_gz(dir.path(), &output_file);
-        assert!(result.is_ok());
-        assert!(output_file.exists());
+        assert!(result.is_ok(), "Compression failed");
+        assert!(output_file.exists(), "Output file not found");
     }
 }

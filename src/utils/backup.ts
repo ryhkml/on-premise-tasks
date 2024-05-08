@@ -34,7 +34,8 @@ export async function backupDb(method: SqliteBackupMethod = "LOCAL") {
 }
 
 async function tarDb() {
-	const output = "./db-" + new Date().toISOString() + ".bak.tar.gz";
+	const dirDb = dirname(env.PATH_SQLITE!);
+	const output = dirDb + "-" + new Date().toISOString() + ".bak.tar.gz";
 	try {
 		await $`tar -czf ${output} ${dirname(env.PATH_SQLITE!)}`;
 		return {
@@ -42,8 +43,7 @@ async function tarDb() {
 			method: "default"
 		};
 	} catch (_) {
-		// If "tar" command is not available
-		// Or use distroless docker image
+		// If "tar" command is not available or using distroless docker image
 		const lib = dlopen("/usr/local/lib/libtar." + suffix, {
 			compress_dir: {
 				args: [
@@ -54,14 +54,14 @@ async function tarDb() {
 			}
 		});
 		const isDone = !!lib.symbols.compress_dir(
-			Buffer.from("./db" + "\0", "utf-8"),
+			Buffer.from(dirDb + "\0", "utf-8"),
 			Buffer.from(output + "\0", "utf-8")
 		);
 		if (isDone) {
 			return {
 				output,
 				method: "lib"
-			}
+			};
 		}
 		throw new Error("Compression failed");
 	}
