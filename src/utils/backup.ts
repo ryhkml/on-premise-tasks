@@ -37,7 +37,7 @@ async function tarDb() {
 	const dirDb = dirname(env.PATH_SQLITE!);
 	const output = dirDb + "-" + new Date().toISOString() + ".bak.tar.gz";
 	try {
-		await $`tar -czf ${output} ${dirname(env.PATH_SQLITE!)}`;
+		await $`tar -czf ${output} ${dirDb}`;
 		return {
 			output,
 			method: "default"
