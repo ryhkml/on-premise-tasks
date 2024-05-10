@@ -111,7 +111,11 @@ describe("Test FETCH", () => {
 						method: "POST",
 						data: {
 							id: 1,
-							title: "Hello from mars"
+							title: "Hello from mars",
+							metadata: {
+								test: true,
+								inclination: [1.850, 5.65, 1.63]
+							}
 						}
 					},
 					// @ts-ignore
@@ -124,7 +128,11 @@ describe("Test FETCH", () => {
 			expect(res.headers.payload["content-type"]).toBe("application/json");
 			expect(res.data.payload).toMatchObject({
 				id: 1,
-				title: "Hello from mars"
+				title: "Hello from mars",
+				metadata: {
+					test: true,
+					inclination: [1.850, 5.65, 1.63]
+				}
 			});
 		});
 	});

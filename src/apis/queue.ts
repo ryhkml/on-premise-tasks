@@ -459,16 +459,11 @@ export function queue() {
 									maxLength: 128,
 									pattern: "^[a-zA-Z0-9\-\_\:\.]$"
 								}),
-								t.Union([
-									t.String({
-										minLength: 1,
-										maxLength: Number.MAX_SAFE_INTEGER
-									}),
-									t.Number()
-								]), {
+								t.Any(),
+								{
 									default: null,
-									maxProperties: 1,
-									minProperties: Number.MAX_SAFE_INTEGER
+									minProperties: 1,
+									maxProperties: Number.MAX_SAFE_INTEGER,
 								}
 							)
 						])

@@ -86,13 +86,13 @@ interface TaskSubscriberRequest {
     config?: TasksConfig;
 }
 
-type PlainTextData = string
+type PlainTextData = string;
 type MultipartFormData = {
     name: string;
     value: string;
 }
 type ApplicationJsonData = {
-    [key: string]: string | number;
+    [key: string]: any;
 }
 
 interface TasksHttp {

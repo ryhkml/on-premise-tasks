@@ -23,7 +23,7 @@ declare global {
 	}
 
 	type ApplicationJsonData = {
-		[k: string]: string | number;
+		[k: string]: SafeAny;
 	}
 
 	type ObjectStrData = {

@@ -1,6 +1,6 @@
-import { spawn } from "bun";
+import { readableStreamToText, spawn } from "bun";
 
-import { Observable, TimeoutError, catchError, map, throwError, timeout } from "rxjs";
+import { TimeoutError, catchError, defer, map, throwError, timeout } from "rxjs";
 import { isArray, isPlainObject, toSafeInteger, toString } from "lodash";
 
 export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: string }) {
@@ -36,18 +36,28 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push("-H");
 			options.push("content-type: application/json");
 			options.push("-d");
-			options.push(JSON.stringify(req.httpRequest.data));
+			const escapeJsonStr = JSON.stringify(req.httpRequest.data)
+				.replace(/\\n/g, "\\n")
+				.replace(/\\'/g, "\\'")
+				.replace(/\\"/g, '\\"')
+				.replace(/\\&/g, "\\&")
+				.replace(/\\r/g, "\\r")
+				.replace(/\\t/g, "\\t")
+				.replace(/\\b/g, "\\b")
+				.replace(/\\f/g, "\\f")
+				.trim();
+			options.push(escapeJsonStr);
 		} else if (isArray(req.httpRequest.data)) {
 			for (let i = 0; i < req.httpRequest.data.length; i++) {
 				const { name, value } = req.httpRequest.data[i];
 				options.push("--form-string");
-				options.push(name + "=" + value);
+				options.push(name.trim() + "=" + value.trim());
 			}
 		} else {
 			options.push("-H");
 			options.push("content-type: plain/text");
 			options.push("-d");
-			options.push(req.httpRequest.data as string);
+			options.push(toString(req.httpRequest.data).trim());
 		}
 	}
 	// Cookie
@@ -177,7 +187,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 	options.push("&&SPLIT&&%{response_code}&&SPLIT&&%{size_download}&&SPLIT&&%{size_header}");
 	options.push("--url");
 	options.push(url);
-	return curl(options).pipe(
+	return defer(() => curl(options)).pipe(
 		map(text => {
 			const [payload, code, sizeData, sizeHeader] = text.split("&&SPLIT&&") as [string, string, string, string];
 			const status = toSafeInteger(code);
@@ -241,13 +251,6 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 }
 
 function curl(options: Array<string>) {
-	return new Observable<string>(observer => {
-		const proc = spawn(["curl", ...options], { env: {} });
-		new Response(proc.stdout).text()
-			.then(text => {
-				observer.next(text.trim());
-				observer.complete();
-			})
-			.catch(error => observer.error(error));
-	});
+	const proc = spawn(["curl", ...options], { env: {} });
+	return readableStreamToText(proc.stdout);
 }
