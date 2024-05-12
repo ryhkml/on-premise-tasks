@@ -216,6 +216,9 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			} as FetchRes;
 		}),
 		timeout({
+			first: !!req.config.timeoutAt
+				? new Date(req.config.timeoutAt)
+				: undefined,
 			each: req.config.timeout
 		}),
 		catchError(error => {

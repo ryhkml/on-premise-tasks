@@ -19,6 +19,7 @@ CREATE TABLE config (
 	retryExponential 		INTEGER NULL DEFAULT 1,
 	estimateNextRetryAt 	INTEGER NULL DEFAULT 0,
 	timeout 				INTEGER NULL DEFAULT 30000,
+	timeoutAt 				INTEGER NULL DEFAULT 0,
 	dnsServer				TEXT NULL,
 	dohUrl					TEXT NULL,
 	dohInsecure				INTEGER NULL DEFAULT 0,

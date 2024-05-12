@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { Elysia, t } from "elysia";
 import { cron, Patterns } from "@elysiajs/cron";
 
-import { addMilliseconds, differenceInMilliseconds, isBefore, millisecondsToSeconds } from "date-fns";
+import { addMilliseconds, differenceInMilliseconds, isAfter, isBefore, millisecondsToSeconds } from "date-fns";
 import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
 import { isPlainObject, kebabCase, toSafeInteger, toString } from "lodash";
 
@@ -56,6 +56,7 @@ export function queue() {
 			retryStatusCode: [] as Array<number>,
 			retryExponential: true,
 			timeout: 30000,
+			timeoutAt: 0,
 			dnsServer: null,
 			dohInsecure: false,
 			dohUrl: null,
@@ -404,6 +405,23 @@ export function queue() {
 							message: "Retry date must be greater than execution date"
 						});
 					}
+					if (ctx.body.config.timeoutAt) {
+						const estimateTimeoutAt = new Date(ctx.body.config.timeoutAt);
+						if (isAfter(estimateTimeoutAt, estimateRetryAt)) {
+							return ctx.error("Bad Request", {
+								message: "Timeout date must be less than retry date"
+							});
+						}
+					}
+				} else {
+					if (ctx.body.config.timeoutAt) {
+						const estimateTimeoutAt = new Date(ctx.body.config.timeoutAt);
+						if (isBefore(estimateTimeoutAt, stateEstimateExecutionDate)) {
+							return ctx.error("Bad Request", {
+								message: "Timeout date must be greater than execution date"
+							});
+						}
+					}
 				}
 				stateEstimateExecutionDate = null;
 			},
@@ -582,6 +600,11 @@ export function queue() {
 						default: 30000,
 						minimum: 1000,
 						maximum: 3600000
+					}),
+					timeoutAt: t.Integer({
+						default: 0,
+						minimum: 0,
+						maximum: Number.MAX_SAFE_INTEGER
 					}),
 					dnsServer: t.Union([
 						t.Array(
@@ -1042,6 +1065,10 @@ function registerQueue(ctx: SubscriptionContext) {
 		raw += " timeout = ?,";
 		rawBindings.push(ctx.body.config.timeout);
 	}
+	if (ctx.body.config.timeoutAt) {
+		raw += " timeoutAt = ?,";
+		rawBindings.push(ctx.body.config.timeoutAt);
+	}
 	if (ctx.body.config.dnsServer) {
 		raw += " dnsServer = ?,";
 		rawBindings.push(
@@ -1212,6 +1239,7 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			retryStatusCode: JSON.parse(rq.retryStatusCode),
 			retryExponential: !!rq.retryExponential,
 			timeout: rq.timeout,
+			timeoutAt: rq.timeoutAt,
 			dnsServer: !!rq.dnsServer
 				? JSON.parse(decr(rq.dnsServer, key))
 				: null,

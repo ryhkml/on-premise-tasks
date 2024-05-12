@@ -124,6 +124,7 @@ interface TasksConfig {
     retryStatusCode?: Array<number>; // Default []
     retryExponential?: boolean; // Default true
     timeout?: number; // Default 30000ms, min: 1000ms, max: 3600000ms
+    timeoutAt?: number; // Default 0
     //
     // The configuration below refers to the curl options (not all options are supported)
     // Visit https://curl.se/docs/manpage.html for more information
@@ -215,6 +216,10 @@ curl -X POST \
 Please note that properties ending with `"At"` are in UNIX time format:
 - `executeAt`
 - `retryAt`
+- `timeoutAt`
+
+**Attention**
+`timeoutAt` will be executed only once. If the task has been retried several times then it will continue using `timeout`
 
 To find out milliseconds in various programming languages, you can visit https://currentmillis.com and remember to set the environment variable `TZ=UTC` on the Tasks Server.
 

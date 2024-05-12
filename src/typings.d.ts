@@ -73,6 +73,7 @@ declare global {
 		retryStatusCode: Array<number>;
 		retryExponential: boolean;
 		timeout: number;
+		timeoutAt: number;
 		dnsServer: Array<string> | null;
 		dohUrl: string | null;
 		/**
@@ -200,6 +201,7 @@ declare global {
 		retryExponential: number;
 		estimateNextRetryAt: number;
 		timeout: number;
+		timeoutAt: number;
 		/**
 		 * ATTENTION
 		 *
