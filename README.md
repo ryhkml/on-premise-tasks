@@ -6,9 +6,11 @@
 
 On-Premise Tasks is a managed execution service for task delivery or distribution needs. Technically, a task is an object that represents a single-use execution resource. You can request tasks to On-Premise Tasks, which will then be executed at a future time. On-Premise Tasks will execute it and send it to the specified target URL
 
-```txt
-[TASK] ———————(register)———————> [QUEUE] ———————(http)———————> [SERVICE]
-```
+<br>
+
+<div align="center">
+	<img src="./diagram.png" alt="Diagram On-Premise Tasks">
+</div>
 
 ## Features
 1. HTTP request
@@ -218,8 +220,9 @@ Please note that properties ending with `"At"` are in UNIX time format:
 - `retryAt`
 - `timeoutAt`
 
-**Attention**
-`timeoutAt` will be executed only once. If the task has been retried several times then it will continue using `timeout`
+Attention:
+- `retryAt` is the same as `retry = 1` with a specific time
+- `timeoutAt` will be executed only once. If the task has been retried several times, then it will continue using `timeout`.
 
 To find out milliseconds in various programming languages, you can visit https://currentmillis.com and remember to set the environment variable `TZ=UTC` on the Tasks Server.
 
