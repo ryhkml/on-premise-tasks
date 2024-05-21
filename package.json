@@ -1,6 +1,6 @@
 {
 	"name": "op-tasks",
-	"version": "1.0.50",
+	"version": "1.0.0-alpha.1",
 	"private": true,
 	"maintainers": [
 		"Reyhan Kamil"
@@ -14,11 +14,11 @@
 	},
 	"dependencies": {
 		"@elysiajs/cron": "^1.0.3",
-		"@elysiajs/eden": "^1.0.12",
-		"@google-cloud/storage": "^7.10.2",
+		"@elysiajs/eden": "^1.0.13",
+		"@google-cloud/storage": "^7.11.0",
 		"crypto-js": "^4.2.0",
 		"date-fns": "^3.6.0",
-		"elysia": "^1.0.15",
+		"elysia": "^1.0.20",
 		"lodash": "^4.17.21",
 		"nanoid": "^5.0.7",
 		"rxjs": "^7.8.1",
