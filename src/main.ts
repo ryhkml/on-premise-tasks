@@ -65,4 +65,4 @@ const options: Partial<Serve> = {
 	ca
 };
 
-app.listen(options, server => console.log("Server listening on port", server.port));
+app.listen(options, server => console.log("Server listening on", server.url.origin));
