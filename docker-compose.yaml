@@ -20,7 +20,7 @@ services:
     ports:
       - ${PORT}:${PORT}
     volumes:
-      - db:/app/db
+      - db:/home/app/db
     networks:
       - net
     env_file:

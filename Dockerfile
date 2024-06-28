@@ -15,20 +15,25 @@ COPY init-db.ts ./
 COPY bunfig.toml ./
 COPY bun.lockb ./
 COPY src ./src/
-COPY .env.production ./
+COPY .env.production ./.env
 COPY Cargo.lock ./
 COPY Cargo.toml ./
 
-RUN ~/.cargo/bin/cargo build --release && \
-	~/.bun/bin/bun install --frozen-lockfile --production && \
-    mkdir db && \
+RUN export PATH="$HOME/.cargo/bin:$PATH" && \
+	export BUN_INSTALL="$HOME/.bun" && \
+	export PATH="$BUN_INSTALL/bin:$PATH" && \
+	cargo build --release && \
+	bun install --production && \
 	cd /usr/local/lib && \
 	ln -s /app/target/release/libtar.so && \
 	cd /app && \
-    ~/.bun/bin/bun --env-file=.env.production run init-db.ts && \
-    ~/.bun/bin/bun --env-file=.env.production test --timeout 10000 && \
-    ~/.bun/bin/bun --env-file=.env.production run init-db.ts && \
-    ~/.bun/bin/bun build --compile --minify --sourcemap ./src/main.ts --outfile ./tasks
+	cargo test --workspace && \
+	mkdir db && \
+    bun run init-db.ts && \
+    bun test --timeout 15000 && \
+	rm -rf ./db/* && \
+    bun run init-db.ts && \
+    bun build --compile --minify --sourcemap ./src/main.ts --outfile ./tasks
 
 # Final stage
 FROM rockylinux:9-minimal
