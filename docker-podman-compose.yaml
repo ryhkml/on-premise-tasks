@@ -1,25 +1,19 @@
-secrets:
-  env:
-    file: .env.production
 services:
   app:
     container_name: tasks-server
     hostname: tasks-server
     restart: unless-stopped
-    secrets:
-      - env
+    privileged: true
     build:
       args:
         - PORT=${PORT}
       context: .
-      secrets:
-        - env
       no_cache: true
       dockerfile: Dockerfile
     ports:
       - ${PORT}:${PORT}
     volumes:
-      - db:/home/app/db
+      - db:/home/app/db:Z
     networks:
       - net
     env_file:

@@ -1,18 +1,15 @@
 {
-	"[typescript]": {
-		"editor.tabSize": 4
-	},
-	"[json]": {
-		"editor.tabSize": 4
-	},
-	"[html]": {
-		"editor.tabSize": 4
+	"editor.detectIndentation": false,
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4,
+	"files.associations": {
+		"**/docker-compose.yml": "yaml",
+		"**/docker-compose*.yml": "yaml",
+		"**/docker-podman-compose.yml": "yaml",
+		"**/docker-podman-compose*.yml": "yaml"
 	},
 	"[yaml]": {
+		"editor.insertSpaces": true,
 		"editor.tabSize": 2
-	},
-	"editor.fontLigatures": true,
-	"editor.letterSpacing": 0.4,
-	"editor.lineHeight": 1.6,
-	"editor.smoothScrolling": true
+	}
 }
