@@ -1,5 +1,4 @@
 mosl = true
-frozenLockfile = true
 
 [install.cache]
 disable = true

@@ -19,36 +19,36 @@ On-Premise Tasks is a managed execution service for task delivery or distributio
 
 ## Getting Started
 Make sure you have [bun](https://bun.sh/docs/installation) and [rust](https://www.rust-lang.org/tools/install) installed, then run:
-```bash
+```sh
 ./init.sh
 ```
 
 ## Development
 To start the development server, run:
-```bash
+```sh
 bun run dev
 ```
 
 ## Test
 To start the test server, run:
-```bash
+```sh
 bun run test
-# For file specific test
+# Or test specifically the file name
 bun test <FILENAME>
 ```
 
 ## Single file executable
 To start the single file executable, run:
-```bash
+```sh
 # Compile
 bun run bin
 # Run
-NODE_ENV=production ./tasks
+./tasks
 ```
 
 ## Docker build
-To start the docker build, run:
-```bash
+To start docker during development, run:
+```sh
 # Build
 docker compose -p <STACK_NAME> --env-file <ENV_FILE> up -d --build
 # Down
@@ -57,11 +57,11 @@ docker compose -p <STACK_NAME> down
 
 ## Path configuration
 You can use absolute path or current working path, for example:
-```ts
-// Absolute path
-"/etc/tasks/db/tasks.db"
-// Current working path
-"./db/tasks.db"
+```sh
+# Absolute path
+/tmp/tasks/db/tasks.db
+# Current working path
+./db/tasks.db
 ```
 
 ## APIs
@@ -186,12 +186,12 @@ curl -X POST \
 
 The example above, the task will be executed after waiting for 1 day. If the task receives a 4xx-5xx error response, it will be run again 5 times with a 1-hour interval between each execution. If `retryExponential = true`, the interval between each execution will increase
 
-```
+```txt
 retryInterval = 3600000ms
 
-Retry-1, 3600000 * 1 = 3600000ms
-Retry-2, 3600000 * 2 = 7200000ms
-Retry-3, 3600000 * 3 = 10800000ms
+Retry-1: 3600000 * 1 = 3600000ms
+Retry-2: 3600000 * 2 = 7200000ms
+Retry-3: 3600000 * 3 = 10800000ms
 
 And so on...
 ```
@@ -230,7 +230,7 @@ To find out milliseconds in various programming languages, you can visit https:/
 
 There are two backup methods:
 1. Local. The local method copies the database file, then moves it to another directory. This method is active by default
-2. Google Cloud Storage. The Google Cloud Storage method uploads database files to a Google Cloud Storage.
+2. Google Cloud Storage. The Google Cloud Storage method uploads database files to a Google Cloud Storage. This step is highly recommended.
 
 You can set it via env variable
 ```ts
@@ -243,7 +243,7 @@ BACKUP_METHOD_SQLITE="LOCAL"
 You can also set the backup interval using the cron format
 ```sh
 # Default: Every day at midnight
-BACKUP_CRON_PATTERN_SQLITE=
+BACKUP_CRON_PATTERN_SQLITE="0 0 * * *"
 ```
 
 ### Set up authentication for Google Cloud Storage
