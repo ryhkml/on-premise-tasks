@@ -1,9 +1,10 @@
 services:
-  app:
+  dev:
     container_name: tasks-server
     hostname: tasks-server
     restart: unless-stopped
-    privileged: true
+    stdin_open: true
+    tty: true
     build:
       args:
         - PORT=${PORT}
@@ -13,7 +14,7 @@ services:
     ports:
       - ${PORT}:${PORT}
     volumes:
-      - db:/home/app/db:Z
+      - db:/home/app/db
     networks:
       - net
     env_file:
@@ -26,6 +27,7 @@ services:
         reservations:
           cpus: "0.5"
           memory: 64M
+    oom_score_adj: 200
 volumes:
   db:
 networks:

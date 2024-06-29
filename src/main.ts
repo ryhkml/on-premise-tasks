@@ -9,6 +9,7 @@ import { subscriber } from "./apis/subscriber";
 import { queue } from "./apis/queue";
 import { backupDb } from "./utils/backup";
 import { startup } from "./startup";
+import { error, info } from "./utils/logger";
 
 const app = new Elysia()
 	.headers({
@@ -37,7 +38,7 @@ const app = new Elysia()
 				}
 			});
 		}
-		console.error("ERROR HTTP EXCEPTION:", ctx.error.message);
+		error(ctx.error.message);
 		return ctx.error;
 	})
 	.use(subscriber())
@@ -65,4 +66,4 @@ const options: Partial<Serve> = {
 	ca
 };
 
-app.listen(options, server => console.log("Server listening on", server.url.origin));
+app.listen(options, server => info(`Server listening on ${server.url.origin}`));

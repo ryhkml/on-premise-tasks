@@ -3,30 +3,28 @@ import { $, env, file } from "bun";
 import { exit } from "node:process";
 
 import { Elysia } from "elysia";
-import { EMPTY, catchError, concat, defer, forkJoin, of, switchMap, tap } from "rxjs";
-import { toString } from "lodash";
+import { EMPTY, catchError, concat, defer, finalize, forkJoin, of, switchMap, tap, throwError } from "rxjs";
 
 import { connectivity } from "./utils/connectivity";
 import { setPragma } from "./db";
+import { error, warn } from "./utils/logger";
 
 export function startup(app: Elysia) {
 	return concat(
 		// Commands
 		defer(() => $`tar --version`.text()).pipe(
-			tap({
-				error(e) {
-					console.warn(toString(e));
-				}
-			}),
+			catchError(e => EMPTY.pipe(
+				finalize(() => warn(`${String(e)}: tar command not found, "libtar.so" will be used automatically`))
+			)),
 			switchMap(() => EMPTY)
 		),
 		defer(() => $`curl -V`.text()).pipe(
-			tap({
-				error(e) {
-					console.error(toString(e));
+			catchError(e => throwError(() => String(e)).pipe(
+				finalize(() => {
+					error(`${String(e)}: curl command not found, try installing curl`);
 					exit(1);
-				}
-			}),
+				})
+			)),
 			switchMap(() => EMPTY)
 		),
 		// Database
@@ -38,7 +36,7 @@ export function startup(app: Elysia) {
 						// @ts-ignore
 						setPragma(app.decorator.db);
 					} else {
-						console.error("Database not found");
+						error("Database not found");
 						exit(1);
 					}
 				}
@@ -49,7 +47,7 @@ export function startup(app: Elysia) {
 		connectivity().pipe(
 			tap({
 				error(e) {
-					console.error(e);
+					error(String(e));
 					exit(1);
 				}
 			}),
@@ -60,11 +58,11 @@ export function startup(app: Elysia) {
 			tap({
 				next([tz, ck]) {
 					if (tz != "UTC") {
-						console.error("Invalid value. Env variable \"TZ\" must be UTC");
+						error("Invalid value. Env variable \"TZ\" must be UTC");
 						exit(1);
 					}
 					if (ck == "" || ck == null) {
-						console.error("Invalid value. Env variable \"CIPHER_KEY\" is required");
+						error("Invalid value. Env variable \"CIPHER_KEY\" is required");
 						exit(1);
 					}
 				}

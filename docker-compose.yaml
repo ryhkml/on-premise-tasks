@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     secrets:
       - env
+    stdin_open: true
+    tty: true
     build:
       args:
         - PORT=${PORT}

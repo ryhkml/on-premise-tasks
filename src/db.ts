@@ -2,7 +2,10 @@ import { env } from "bun";
 import { Database } from "bun:sqlite";
 
 export function tasksDb() {
-	return new Database(env.PATH_SQLITE);
+	return new Database(env.PATH_SQLITE, {
+		readwrite: true,
+		strict: true
+	});
 }
 
 export function stmtSubscriberTasksInQueue() {

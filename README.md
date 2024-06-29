@@ -46,12 +46,14 @@ bun run bin
 ./tasks
 ```
 
-## Docker build
-To start docker during development, run:
+## Docker or Podman build
+To start docker or podman during development, run:
 ```sh
-# Build
+# For docker
 docker compose -p <STACK_NAME> --env-file <ENV_FILE> up -d --build
-# Down
+# For podman
+podman compose -p <STACK_NAME> --file docker-podman-compose.yaml --env-file <ENV_FILE> up -d --build
+# Cleanup
 docker compose -p <STACK_NAME> down
 ```
 
