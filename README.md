@@ -54,8 +54,9 @@ docker compose -p <STACK_NAME> --env-file <ENV_FILE> up -d --build
 # For podman
 podman compose -p <STACK_NAME> --file docker-podman-compose.yaml --env-file <ENV_FILE> up -d --build
 # Cleanup
-docker compose -p <STACK_NAME> down
+docker/podman compose -p <STACK_NAME> down
 ```
+**Why Rocky Linux?** By default, Rocky Linux includes curl with the latest version that supports DNS features. However, it's also recommended to consider using other minimalist Docker images, such as distroless, with curl included. Developer strive to keep the image minimalist for production needs.
 
 ## Path configuration
 You can use absolute path or current working path, for example:
