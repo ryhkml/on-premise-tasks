@@ -64,3 +64,5 @@ tls/*.csr
 tls/*.cert
 tls/*.key
 tls/*.pem
+
+rest.http

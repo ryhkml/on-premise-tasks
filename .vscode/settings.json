@@ -2,12 +2,8 @@
 	"editor.detectIndentation": false,
 	"editor.insertSpaces": false,
 	"editor.tabSize": 4,
-	"files.associations": {
-		"**/docker-compose.yml": "yaml",
-		"**/docker-compose*.yml": "yaml",
-		"**/docker-podman-compose.yml": "yaml",
-		"**/docker-podman-compose*.yml": "yaml"
-	},
+	"files.insertFinalNewline": false,
+	"files.trimFinalNewlines": false,
 	"[yaml]": {
 		"editor.insertSpaces": true,
 		"editor.tabSize": 2

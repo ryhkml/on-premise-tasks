@@ -1,10 +1,12 @@
-node_modules/
-db/
 .vscode/
 
+node_modules/
+db/
+
 docker-compose*
+docker-podman-compose*
 cosign*
 
 note.txt
 
-.env.development
+.env.example
