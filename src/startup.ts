@@ -3,7 +3,7 @@ import { $, env, file } from "bun";
 import { exit } from "node:process";
 
 import { Elysia } from "elysia";
-import { EMPTY, catchError, concat, defer, finalize, forkJoin, of, switchMap, tap, throwError } from "rxjs";
+import { EMPTY, catchError, concat, defer, finalize, forkJoin, map, of, switchMap, tap, throwError } from "rxjs";
 
 import { connectivity } from "./utils/connectivity";
 import { setPragma } from "./db";
@@ -14,14 +14,14 @@ export function startup(app: Elysia) {
 		// Commands
 		defer(() => $`tar --version`.text()).pipe(
 			catchError(e => EMPTY.pipe(
-				finalize(() => warn(`${String(e)}: tar command not found, "libtar.so" will be used automatically`))
+				finalize(() => warn(`${String(e)}: "tar" command not found, "libtar.so" will be used automatically`))
 			)),
 			switchMap(() => EMPTY)
 		),
 		defer(() => $`curl -V`.text()).pipe(
 			catchError(e => throwError(() => String(e)).pipe(
 				finalize(() => {
-					error(`${String(e)}: curl command not found, try installing curl`);
+					error(`${String(e)}: "curl" command not found, try installing curl`);
 					exit(1);
 				})
 			)),
@@ -80,6 +80,16 @@ export function startup(app: Elysia) {
 			defer(() => file(env.PATH_TLS_CA!).text()).pipe(
 				catchError(() => of(undefined))
 			)
-		])
+		]).pipe(
+			map(tls => {
+				if (tls[0] && tls[1] == null) {
+					tls[0] = undefined;
+				}
+				if (tls[1] && tls[0] == null) {
+					tls[1] = undefined;
+				}
+				return tls;
+			})
+		)
 	);
 }
