@@ -4,7 +4,7 @@
     </h1>
 </div>
 
-On-Premise Tasks is a managed execution service for task delivery or distribution needs. Technically, a task is an object that represents a single-use execution resource. You can request tasks to On-Premise Tasks, which will then be executed at a future time. On-Premise Tasks will execute it and send it to the specified target URL
+**On-Premise Tasks** is a managed service that handles the execution and distribution of tasks. A task is essentially an object that signifies a resource meant for one-time use. You can request tasks from **On-Premise Tasks**, and they will be carried out at a later time.
 
 <br>
 
@@ -56,7 +56,7 @@ podman compose -p <STACK_NAME> --file docker-podman-compose.yaml --env-file <ENV
 # Cleanup
 docker/podman compose -p <STACK_NAME> down
 ```
-**Why Rocky Linux?** By default, Rocky Linux includes curl with the latest version that supports DNS features. However, it's also recommended to consider using other minimalist Docker images, such as distroless, with curl included. Developer strive to keep the image minimalist for production needs.
+**Why Nix Store?** The Nix store is an abstraction to store immutable file system data (such as software packages) that can have dependencies on other such data. In this case, On-Premise Tasks copies the nix store directory to a final stage that only requires the curl binary and its dependencies.
 
 ## Path configuration
 You can use absolute path or current working path, for example:
@@ -232,8 +232,8 @@ To find out milliseconds in various programming languages, you can visit https:/
 ## SQLite Backup
 
 There are two backup methods:
-1. Local. The local method copies the database file, then moves it to another directory. This method is active by default
-2. Google Cloud Storage. The Google Cloud Storage method uploads database files to a Google Cloud Storage. This step is highly recommended.
+1. **Local**. The local method copies the database file, then moves it to another directory. This method is active by default
+2. **Google Cloud Storage**. The Google Cloud Storage method uploads database files to a Google Cloud Storage. This step is highly recommended.
 
 You can set it via env variable
 ```ts

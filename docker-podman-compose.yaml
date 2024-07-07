@@ -3,7 +3,6 @@ services:
     container_name: tasks-server
     hostname: tasks-server
     restart: unless-stopped
-    stdin_open: true
     tty: true
     build:
       args:
@@ -12,9 +11,9 @@ services:
       no_cache: true
       dockerfile: Dockerfile
     ports:
-      - ${PORT}:${PORT}
+      - "127.0.0.1:${PORT}:${PORT}"
     volumes:
-      - db:/home/app/db
+      - db:/home/nonroot/app/db
     networks:
       - net
     env_file:
@@ -23,7 +22,7 @@ services:
       resources:
         limits:
           cpus: "1"
-          memory: 256M
+          memory: 512M
         reservations:
           cpus: "0.5"
           memory: 64M
