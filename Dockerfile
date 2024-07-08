@@ -3,10 +3,10 @@ FROM debian:12 AS build
 
 ENV NODE_ENV=production
 
-RUN apt update && \
-	apt install -y build-essential curl unzip && \
-	curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-	curl -fsSL https://bun.sh/install | bash
+RUN apt-get update && \
+	apt-get install -y build-essential curl unzip && \
+	curl --proto "=https" --tlsv1.2 -sSf --retry 3 --retry-max-time 30 https://sh.rustup.rs | sh -s -- -y && \
+	curl --proto "=https" -fsSL --retry 3 --retry-max-time 30 https://bun.sh/install | bash
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV BUN_INSTALL="/root/.bun"
@@ -39,9 +39,11 @@ FROM nixos/nix AS nix-store
 
 ENV NIXPKGS_ALLOW_UNFREE=1
 
+COPY src/nixpkgs/default.nix /tmp/default.nix
+
 RUN mkdir -p /output/store && \
 	nix-channel --update && \
-	nix-env --profile /output/profile -i curl && \
+	nix-env --profile /output/profile -i -f /tmp/default.nix && \
 	cp -a $(nix-store -qR /output/profile) /output/store && \
 	nix-collect-garbage && \
 	nix-collect-garbage -d
