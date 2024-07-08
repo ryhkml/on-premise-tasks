@@ -1,2 +1,4 @@
-src/nixpkgs/*.nix linguist-language=Nix
-src/sql/**/*.sql linguist-language=SQL
+*.nix linguist-language=Nix
+*.sql linguist-language=SQL
+
+*.test.ts linguist-documentation
