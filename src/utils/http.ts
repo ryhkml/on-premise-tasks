@@ -2,13 +2,51 @@ import { readableStreamToText, spawn } from "bun";
 
 import { TimeoutError, catchError, defer, map, throwError, timeout } from "rxjs";
 import { isArray, isPlainObject, toSafeInteger, toString } from "lodash";
+import { nanoid } from "nanoid";
 
 export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: string }) {
-	const options = ["-s", "-L", "-4"];
+	const options = ["-s"];
 	// Method
 	if (req.httpRequest.method) {
 		options.push("-X");
 		options.push(req.httpRequest.method);
+	}
+	// IP. Use IP addresses only when resolving hostnames
+	options.push("-" + req.config.ipv.toString());
+	// Proto. By default, proto only enables http and https
+	if (req.config.proto) {
+		options.push("--proto");
+		options.push("=" + req.config.proto);
+	} else {
+		options.push("--proto");
+		options.push("-all,http,https");
+	}
+	// Location
+	if (req.config.location) {
+		options.push("-L");
+		// Max Redirect
+		if (req.config.redirectAttempts) {
+			options.push("--max-redirs");
+			options.push(req.config.redirectAttempts.toString());
+		} else {
+			options.push("--max-redirs");
+			options.push("8");
+		}
+		// Proto redirect. By default, proto redirect only enables http and https
+		if (req.config.protoRedirect) {
+			options.push("--proto-redir");
+			options.push("=" + req.config.protoRedirect);
+		} else {
+			options.push("--proto-redir");
+			options.push("-all,http,https");
+		}
+		// Location trusted
+		if (req.config.locationTrusted) {
+			const { user, password } = req.config.locationTrusted;
+			options.push("--location-trusted");
+			options.push("-u");
+			options.push(user + ":" + password);
+		}
 	}
 	// HTTP basic authentication
 	if (req.httpRequest.authBasic) {
@@ -16,6 +54,28 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 		options.push("-u");
 		options.push(user + ":" + password);
 		options.push("--basic");
+	}
+	// HTTP digest authentication
+	if (req.httpRequest.authDigest) {
+		const { user, password } = req.httpRequest.authDigest;
+		options.push("-u");
+		options.push(user + ":" + password);
+		options.push("--digest");
+	}
+	// HTTP NTLM authentication
+	if (req.httpRequest.authNtlm) {
+		const { user, password } = req.httpRequest.authNtlm;
+		options.push("-u");
+		options.push(user + ":" + password);
+		options.push("--ntlm");
+	}
+	// HTTP AWS V4 signature authentication
+	if (req.httpRequest.authAwsSigv4) {
+		const { provider1, provider2, region, service, key, secret } = req.httpRequest.authAwsSigv4;
+		options.push("--aws-sigv4");
+		options.push(provider1 + ":" + provider2 + ":" + region + ":" + service);
+		options.push("--user");
+		options.push(key + ":" + secret);
 	}
 	// Headers
 	if (req.httpRequest.headers) {
@@ -102,6 +162,9 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 		if (req.config.httpVersion == "2") {
 			options.push("--http2");
 		}
+		if (req.config.httpVersion == "2-prior-knowledge") {
+			options.push("--http2-prior-knowledge");
+		}
 	} else {
 		options.push("--http1.1");
 	}
@@ -118,14 +181,6 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push("-e");
 			options.push(req.config.refererUrl);
 		}
-	}
-	// Max Redirect
-	if (req.config.redirectAttempts) {
-		options.push("--max-redirs");
-		options.push(req.config.redirectAttempts.toString());
-	} else {
-		options.push("--max-redirs");
-		options.push("8");
 	}
 	// Keep Alive Duration
 	if (req.config.keepAliveDuration) {
@@ -148,6 +203,15 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push(resolve);
 		}
 	}
+	// HSTS
+	if (req.config.hsts) {
+		options.push("--hsts");
+		options.push("/tmp/app/" + nanoid(16) + ".txt");
+	}
+	// Session id
+	if (!req.config.sessionId) {
+		options.push("--no-sessionid");
+	}
 	// Proxy
 	if (req.config.proxy) {
 		if (req.config.proxyHttpVersion == "1.0") {
@@ -166,6 +230,20 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push("--proxy-basic");
 			options.push("-U");
 			const { user, password } = req.config.proxyAuthBasic;
+			options.push(user + ":" + password);
+		}
+		// Proxy auth digest
+		if (req.config.proxyAuthDigest) {
+			options.push("--proxy-digest");
+			options.push("-U");
+			const { user, password } = req.config.proxyAuthDigest;
+			options.push(user + ":" + password);
+		}
+		// Proxy auth digest
+		if (req.config.proxyAuthNtlm) {
+			options.push("--proxy-ntlm");
+			options.push("-U");
+			const { user, password } = req.config.proxyAuthNtlm;
 			options.push(user + ":" + password);
 		}
 		// Proxy headers
@@ -257,3 +335,38 @@ function curl(options: Array<string>) {
 	const proc = spawn(["curl", ...options], { env: {} });
 	return readableStreamToText(proc.stdout);
 }
+
+export const DEFAULT_CONFIG: TaskConfig = {
+	executionDelay: 1,
+	executeAt: 0,
+	retry: 0,
+	retryAt: 0,
+	retryInterval: 0,
+	retryStatusCode: [] as Array<number>,
+	retryExponential: true,
+	timeout: 30000,
+	timeoutAt: 0,
+	location: false,
+	locationTrusted: null,
+	proto: null,
+	protoRedirect: null,
+	dnsServer: null,
+	dohInsecure: false,
+	dohUrl: null,
+	httpVersion: "1.1",
+	insecure: false,
+	keepAliveDuration: 30,
+	redirectAttempts: 8,
+	refererUrl: null,
+	resolve: null,
+	ipv: 4,
+	hsts: false,
+	sessionId: true,
+	proxy: null,
+	proxyAuthBasic: null,
+	proxyAuthDigest: null,
+	proxyAuthNtlm: null,
+	proxyHeaders: null,
+	proxyHttpVersion: null,
+	proxyInsecure: false
+};

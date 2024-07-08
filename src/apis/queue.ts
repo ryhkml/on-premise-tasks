@@ -10,7 +10,7 @@ import { addMilliseconds, differenceInMilliseconds, isAfter, isBefore, milliseco
 import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
 import { isPlainObject, kebabCase, toSafeInteger, toString } from "lodash";
 
-import { http } from "../utils/http";
+import { DEFAULT_CONFIG, http } from "../utils/http";
 import { pluginAuth } from "../plugins/auth";
 import { pluginContentLength } from "../plugins/content-length";
 import { decr, encr } from "../utils/crypto";
@@ -47,31 +47,7 @@ export function queue() {
 		.use(pluginAuth())
 		.state("queues", [] as Array<QueueSafe>)
 		.decorate("db", tasksDb())
-		.decorate("defaultConfig", {
-			executionDelay: 1,
-			executeAt: 0,
-			retry: 0,
-			retryAt: 0,
-			retryInterval: 0,
-			retryStatusCode: [] as Array<number>,
-			retryExponential: true,
-			timeout: 30000,
-			timeoutAt: 0,
-			dnsServer: null,
-			dohInsecure: false,
-			dohUrl: null,
-			httpVersion: "1.1",
-			insecure: false,
-			keepAliveDuration: 30,
-			redirectAttempts: 8,
-			refererUrl: null,
-			resolve: null,
-			proxy: null,
-			proxyAuthBasic: null,
-			proxyHeaders: null,
-			proxyHttpVersion: "1.1",
-			proxyInsecure: false
-		})
+		.decorate("defaultConfig", DEFAULT_CONFIG)
 		.decorate("subject", new BehaviorSubject(null))
 		// Get queues
 		.get("", ctx => {
@@ -554,6 +530,52 @@ export function queue() {
 						}, {
 							default: null
 						})
+					),
+					authDigest: t.Optional(
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}, {
+							default: null
+						})
+					),
+					authNtlm: t.Optional(
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}, {
+							default: null
+						})
+					),
+					authAwsSigv4: t.Optional(
+						t.Object({
+							provider1: t.String({
+								minLength: 3
+							}),
+							provider2: t.String({
+								minLength: 3
+							}),
+							region: t.String(),
+							service: t.String({
+								minLength: 2
+							}),
+							key: t.String(),
+							secret: t.String()
+						}, {
+							default: null
+						})
 					)
 				}),
 				config: t.Object({
@@ -606,10 +628,53 @@ export function queue() {
 						minimum: 0,
 						maximum: Number.MAX_SAFE_INTEGER
 					}),
+					location: t.Boolean({
+						default: false
+					}),
+					locationTrusted: t.Union([
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					proto: t.Union([
+						t.Literal("http"),
+						t.Literal("https"),
+						t.Null()
+					], {
+						default: null
+					}),
+					protoRedirect: t.Union([
+						t.Literal("http"),
+						t.Literal("https"),
+						t.Null()
+					], {
+						default: null
+					}),
 					dnsServer: t.Union([
 						t.Array(
 							t.String({
 								format: "ipv4"
+							}),
+							{
+								default: null,
+								minItems: 1,
+								maxItems: 4,
+								uniqueItems: true
+							}
+						),
+						t.Array(
+							t.String({
+								format: "ipv6"
 							}),
 							{
 								default: null,
@@ -637,7 +702,8 @@ export function queue() {
 						t.Literal("0.9"),
 						t.Literal("1.0"),
 						t.Literal("1.1"),
-						t.Literal("2")
+						t.Literal("2"),
+						t.Literal("2-prior-knowledge")
 					], {
 						default: "1.1"
 					}),
@@ -677,17 +743,32 @@ export function queue() {
 									minimum: 1,
 									maximum: 65535
 								}),
-								address: t.Array(
-									t.String({
-										format: "ipv4"
-									}),
-									{
-										default: null,
-										minItems: 1,
-										maxItems: 8,
-										uniqueItems: true
-									}
-								)
+								address: t.Union([
+									t.Array(
+										t.String({
+											format: "ipv4"
+										}),
+										{
+											default: null,
+											minItems: 1,
+											maxItems: 8,
+											uniqueItems: true
+										}
+									),
+									t.Array(
+										t.String({
+											format: "ipv6"
+										}),
+										{
+											default: null,
+											minItems: 1,
+											maxItems: 8,
+											uniqueItems: true
+										}
+									),
+								], {
+									default: []
+								})
 							}),
 							{
 								default: null,
@@ -699,6 +780,18 @@ export function queue() {
 						t.Null()
 					], {
 						default: null
+					}),
+					ipv: t.Union([
+						t.Literal(4),
+						t.Literal(6)
+					], {
+						default: 4
+					}),
+					hsts: t.Boolean({
+						default: false
+					}),
+					sessionId: t.Boolean({
+						default: true
 					}),
 					proxy: t.Union([
 						t.Object({
@@ -743,6 +836,40 @@ export function queue() {
 					], {
 						default: null
 					}),
+					proxyAuthDigest: t.Union([
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}, {
+							default: null
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					proxyAuthNtlm: t.Union([
+						t.Object({
+							user: t.String({
+								minLength: 1,
+								maxLength: 128
+							}),
+							password: t.String({
+								minLength: 1,
+								maxLength: 4096
+							})
+						}, {
+							default: null
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
 					proxyHeaders: t.Union([
 						t.Record(
 							t.String({
@@ -765,9 +892,10 @@ export function queue() {
 					}),
 					proxyHttpVersion: t.Union([
 						t.Literal("1.0"),
-						t.Literal("1.1")
+						t.Literal("1.1"),
+						t.Null()
 					], {
-						default: "1.1"
+						default: null
 					}),
 					proxyInsecure: t.Boolean({
 						default: false
@@ -1046,6 +1174,24 @@ function registerQueue(ctx: SubscriptionContext) {
 			encr(JSON.stringify(ctx.body.httpRequest.authBasic), key)
 		);
 	}
+	if (ctx.body.httpRequest.authDigest) {
+		raw += " authDigest = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.authDigest), key)
+		);
+	}
+	if (ctx.body.httpRequest.authNtlm) {
+		raw += " authNtlm = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.authNtlm), key)
+		);
+	}
+	if (ctx.body.httpRequest.authAwsSigv4) {
+		raw += " authAwsSigv4 = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.httpRequest.authAwsSigv4), key)
+		);
+	}
 	if (ctx.body.config.retryAt) {
 		raw += " retry = 1, retryAt = ?, retryLimit = 1, retryExponential = 0,";
 		rawBindings.push(ctx.body.config.retryAt);
@@ -1068,6 +1214,27 @@ function registerQueue(ctx: SubscriptionContext) {
 	if (ctx.body.config.timeoutAt) {
 		raw += " timeoutAt = ?,";
 		rawBindings.push(ctx.body.config.timeoutAt);
+	}
+	if (ctx.body.config.proto) {
+		raw += " proto = ?,";
+		rawBindings.push(ctx.body.config.proto);
+	}
+	if (ctx.body.config.location) {
+		raw += " location = 1,";
+		if (ctx.body.config.redirectAttempts != 8) {
+			raw += " redirectAttempts = ?,";
+			rawBindings.push(ctx.body.config.redirectAttempts);
+		}
+		if (ctx.body.config.protoRedirect) {
+			raw += " protoRedirect = ?,";
+			rawBindings.push(ctx.body.config.protoRedirect);
+		}
+		if (ctx.body.config.locationTrusted) {
+			raw += " locationTrusted = ?,";
+			rawBindings.push(
+				encr(JSON.stringify(ctx.body.config.locationTrusted), key)
+			);
+		}
 	}
 	if (ctx.body.config.dnsServer) {
 		raw += " dnsServer = ?,";
@@ -1097,10 +1264,6 @@ function registerQueue(ctx: SubscriptionContext) {
 			encr(ctx.body.config.refererUrl, key)
 		);
 	}
-	if (ctx.body.config.redirectAttempts != 8) {
-		raw += " redirectAttempts = ?,";
-		rawBindings.push(ctx.body.config.redirectAttempts);
-	}
 	if (ctx.body.config.keepAliveDuration != 30) {
 		raw += " keepAliveDuration = ?,";
 		rawBindings.push(ctx.body.config.keepAliveDuration);
@@ -1111,28 +1274,50 @@ function registerQueue(ctx: SubscriptionContext) {
 			encr(JSON.stringify(ctx.body.config.resolve), key)
 		);
 	}
+	raw += " ipv = ?,";
+	rawBindings.push(ctx.body.config.ipv);
+	if (ctx.body.config.hsts) {
+		raw += " hsts = 1,";
+	}
+	if (!ctx.body.config.sessionId) {
+		raw += " sessionId = 0,";
+	}
 	if (ctx.body.config.proxy) {
 		raw += " proxy = ?,";
 		rawBindings.push(
 			encr(JSON.stringify(ctx.body.config.proxy), key)
 		);
-	}
-	if (ctx.body.config.proxyAuthBasic) {
-		raw += " proxyAuthBasic = ?,";
-		rawBindings.push(
-			encr(JSON.stringify(ctx.body.config.proxyAuthBasic), key)
-		);
-	}
-	if (ctx.body.config.proxyHeaders) {
-		raw += " proxyHeaders = ?,";
-		rawBindings.push(
-			encr(JSON.stringify(ctx.body.config.proxyHeaders), key)
-		);
-	}
-	raw += " proxyHttpVersion = ?,";
-	rawBindings.push(ctx.body.config.proxyHttpVersion);
-	if (ctx.body.config.proxyInsecure) {
-		raw += " proxyInsecure = 1,";
+		if (ctx.body.config.proxyHttpVersion) {
+			raw += " proxyHttpVersion = ?,";
+			rawBindings.push(ctx.body.config.proxyHttpVersion);
+		}
+		if (ctx.body.config.proxyAuthBasic) {
+			raw += " proxyAuthBasic = ?,";
+			rawBindings.push(
+				encr(JSON.stringify(ctx.body.config.proxyAuthBasic), key)
+			);
+		}
+		if (ctx.body.config.proxyAuthDigest) {
+			raw += " proxyAuthDigest = ?,";
+			rawBindings.push(
+				encr(JSON.stringify(ctx.body.config.proxyAuthDigest), key)
+			);
+		}
+		if (ctx.body.config.proxyAuthNtlm) {
+			raw += " proxyAuthNtlm = ?,";
+			rawBindings.push(
+				encr(JSON.stringify(ctx.body.config.proxyAuthNtlm), key)
+			);
+		}
+		if (ctx.body.config.proxyHeaders) {
+			raw += " proxyHeaders = ?,";
+			rawBindings.push(
+				encr(JSON.stringify(ctx.body.config.proxyHeaders), key)
+			);
+		}
+		if (ctx.body.config.proxyInsecure) {
+			raw += " proxyInsecure = 1,";
+		}
 	}
 	raw = raw.substring(0, raw.length - 1);
 	raw += " WHERE id = ? AND id IN (SELECT id FROM queue);";
@@ -1228,6 +1413,15 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 				: undefined,
 			authBasic: !!rq.authBasic
 				? JSON.parse(decr(rq.authBasic, key))
+				: undefined,
+			authDigest: !!rq.authDigest
+				? JSON.parse(decr(rq.authDigest, key))
+				: undefined,
+			authNtlm: !!rq.authNtlm
+				? JSON.parse(decr(rq.authNtlm, key))
+				: undefined,
+			authAwsSigv4: !!rq.authAwsSigv4
+				? JSON.parse(decr(rq.authAwsSigv4, key))
 				: undefined
 		},
 		config: {
@@ -1240,6 +1434,12 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			retryExponential: !!rq.retryExponential,
 			timeout: rq.timeout,
 			timeoutAt: rq.timeoutAt,
+			location: !!rq.location,
+			locationTrusted: !!rq.locationTrusted
+				? JSON.parse(decr(rq.locationTrusted, key))
+				: null,
+			proto: rq.proto,
+			protoRedirect: rq.protoRedirect,
 			dnsServer: !!rq.dnsServer
 				? JSON.parse(decr(rq.dnsServer, key))
 				: null,
@@ -1257,11 +1457,20 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			resolve: !!rq.resolve
 				? JSON.parse(decr(rq.resolve, key))
 				: null,
+			ipv: rq.ipv,
+			hsts: !!rq.hsts,
+			sessionId: !!rq.sessionId,
 			proxy: !!rq.proxy
 				? JSON.parse(decr(rq.proxy, key))
 				: null,
 			proxyAuthBasic: !!rq.proxyAuthBasic
 				? JSON.parse(decr(rq.proxyAuthBasic, key))
+				: null,
+			proxyAuthDigest: !!rq.proxyAuthDigest
+				? JSON.parse(decr(rq.proxyAuthDigest, key))
+				: null,
+			proxyAuthNtlm: !!rq.proxyAuthNtlm
+				? JSON.parse(decr(rq.proxyAuthNtlm, key))
 				: null,
 			proxyHeaders: !!rq.proxyAuthBasic
 				? JSON.parse(decr(rq.proxyAuthBasic, key))

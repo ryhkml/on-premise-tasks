@@ -3,18 +3,9 @@ import { describe, expect, it } from "bun:test";
 
 import { lastValueFrom } from "rxjs";
 
-import { http } from "./http";
+import { DEFAULT_CONFIG, http } from "./http";
 
 describe("Test FETCH", () => {
-	describe("Curl availability", () => {
-		it("should successfully show version", async () => {
-			const text = await $`curl -V`.text();
-			expect(text).toMatch("Release-Date:");
-			expect(text).toMatch("Protocols:");
-			expect(text).toMatch("Features:");
-		});
-	});
-
 	describe("Main request-response", () => {
 		it("should respond to \"FetchRes\" if the http request is successful", async () => {
 			const result = await lastValueFrom(
@@ -23,8 +14,8 @@ describe("Test FETCH", () => {
 						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 						method: "GET"
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -40,8 +31,8 @@ describe("Test FETCH", () => {
 							url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb/error",
 							method: "GET"
 						},
-						// @ts-ignore
 						config: {
+							...DEFAULT_CONFIG,
 							timeout: 6000
 						}
 					})
@@ -62,8 +53,8 @@ describe("Test FETCH", () => {
 						method: "POST",
 						data: "Hello from mars"
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -88,8 +79,8 @@ describe("Test FETCH", () => {
 							value: "mars"
 						}]
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -118,8 +109,8 @@ describe("Test FETCH", () => {
 							}
 						}
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -150,8 +141,8 @@ describe("Test FETCH", () => {
 							password: "admin123"
 						}
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -175,8 +166,8 @@ describe("Test FETCH", () => {
 							value: "1"
 						}]
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -197,8 +188,8 @@ describe("Test FETCH", () => {
 							"x-my-custom": "Hello from mars"
 						}
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -216,8 +207,8 @@ describe("Test FETCH", () => {
 						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 						method: "GET"
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -238,8 +229,8 @@ describe("Test FETCH", () => {
 							"user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
 						}
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000
 					}
 				})
@@ -257,8 +248,8 @@ describe("Test FETCH", () => {
 						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 						method: "GET"
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000,
 						refererUrl: "https://www.google.com"
 					}
@@ -270,39 +261,6 @@ describe("Test FETCH", () => {
 	});
 
 	describe("GET request", () => {
-		it("should successfully add dns server 8.8.8.8 and 8.8.4.4", async () => {
-			try {
-				await $`curl -sL4 --dns-servers 8.8.8.8,8.8.4.4 https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb`.text();
-				const result = await lastValueFrom(
-					http({
-						httpRequest: {
-							url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
-							method: "GET"
-						},
-						// @ts-ignore
-						config: {
-							timeout: 6000,
-							dnsServer: ["8.8.8.8", "8.8.4.4"]
-						}
-					})
-				);
-				expect(result.status).toBeGreaterThanOrEqual(200);
-				expect(result.status).toBeLessThanOrEqual(299);
-			} catch (error) {
-				// @ts-ignore
-				const message = Buffer.from(error.info.stderr).toString();
-				if (message.includes("version doesn't support")) {
-					console.warn();
-					console.warn("\x1b[33m!\x1b[0m WARNING");
-					console.warn("\x1b[33m!\x1b[0m The installed libcurl version doesn't support this option");
-					console.warn("\x1b[33m!\x1b[0m The option \"--dns-servers\" only works if libcurl was built to use c-ares");
-					console.warn();
-				}
-			}
-		});
-	});
-
-	describe("GET request", () => {
 		it("should successfully add Google DNS-over-HTTPS (https://dns.google/dns-query)", async () => {
 			const result = await lastValueFrom(
 				http({
@@ -310,8 +268,8 @@ describe("Test FETCH", () => {
 						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
 						method: "GET"
 					},
-					// @ts-ignore
 					config: {
+						...DEFAULT_CONFIG,
 						timeout: 6000,
 						dohUrl: "https://dns.google/dns-query"
 					}
@@ -319,6 +277,102 @@ describe("Test FETCH", () => {
 			);
 			expect(result.status).toBeGreaterThanOrEqual(200);
 			expect(result.status).toBeLessThanOrEqual(299);
+		});
+	});
+
+	describe("GET request", () => {
+		it("should successfully add IPv6", async () => {
+			const result = await lastValueFrom(
+				http({
+					httpRequest: {
+						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
+						method: "GET"
+					},
+					config: {
+						...DEFAULT_CONFIG,
+						timeout: 6000,
+						ipv: 6
+					}
+				})
+			);
+			expect(result.status).toBeGreaterThanOrEqual(200);
+			expect(result.status).toBeLessThanOrEqual(299);
+		});
+	});
+
+	describe("GET request", () => {
+		it("should successfully disable session id", async () => {
+			const result = await lastValueFrom(
+				http({
+					httpRequest: {
+						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
+						method: "GET"
+					},
+					config: {
+						...DEFAULT_CONFIG,
+						timeout: 6000,
+						sessionId: false
+					}
+				})
+			);
+			expect(result.status).toBeGreaterThanOrEqual(200);
+			expect(result.status).toBeLessThanOrEqual(299);
+		});
+	});
+
+	describe("GET request", () => {
+		it("should successfully add HSTS", async () => {
+			const result = await lastValueFrom(
+				http({
+					httpRequest: {
+						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
+						method: "GET"
+					},
+					config: {
+						...DEFAULT_CONFIG,
+						timeout: 6000,
+						hsts: true
+					}
+				})
+			);
+			expect(result.status).toBeGreaterThanOrEqual(200);
+			expect(result.status).toBeLessThanOrEqual(299);
+		});
+	});
+
+	describe("GET request", () => {
+		it("should successfully use HTTP/2", async () => {
+			const result = await lastValueFrom(
+				http({
+					httpRequest: {
+						url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
+						method: "GET"
+					},
+					config: {
+						...DEFAULT_CONFIG,
+						timeout: 6000,
+						httpVersion: "2"
+					}
+				})
+			);
+			expect(result.status).toBeGreaterThanOrEqual(200);
+			expect(result.status).toBeLessThanOrEqual(299);
+		});
+	});
+});
+
+describe("Test FEATURES", () => {
+	describe("Show c-ares", () => {
+		it("should successfully support c-ares", async () => {
+			const text = await $`curl -V | grep "c-ares"`.text();
+			expect(text).toBeDefined();
+		});
+	});
+
+	describe("Show gsasl", () => {
+		it("should successfully support gsasl", async () => {
+			const text = await $`curl -V | grep "gsasl"`.text();
+			expect(text).toBeDefined();
 		});
 	});
 });

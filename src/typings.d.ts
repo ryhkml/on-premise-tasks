@@ -38,6 +38,15 @@ declare global {
 	type AuthBasic = {
 		user: string;
 		password: string;
+	};
+
+	type AuthAwsSigv4 = {
+		provider1: string;
+		provider2: string;
+		region: string;
+		service: string;
+		key: string;
+		secret: string;
 	}
 
 	interface TaskHttp {
@@ -48,9 +57,12 @@ declare global {
 		cookie?: Array<Cookie>;
 		headers?: ObjectStrData;
 		authBasic?: AuthBasic;
+		authDigest?: AuthBasic;
+		authNtlm?: AuthBasic;
+		authAwsSigv4?: AuthAwsSigv4;
 	}
 
-	type HttpVersion = "0.9" | "1.0" | "1.1" | "2";
+	type HttpVersion = "0.9" | "1.0" | "1.1" | "2" | "2-prior-knowledge";
 
 	type ResolveProvider = {
 		host: string;
@@ -74,6 +86,13 @@ declare global {
 		retryExponential: boolean;
 		timeout: number;
 		timeoutAt: number;
+		// Redirections
+		location: boolean;
+		locationTrusted: AuthBasic | null;
+		proto: "http" | "https" | null;
+		protoRedirect: "http" | "https" | null;
+		redirectAttempts: number;
+		// DNS
 		dnsServer: Array<string> | null;
 		dohUrl: string | null;
 		/**
@@ -94,13 +113,18 @@ declare global {
 		*/
 		insecure: boolean;
 		refererUrl: string | "AUTO" | null;
-		redirectAttempts: number;
 		keepAliveDuration: number;
 		resolve: Array<ResolveProvider> | null;
+		ipv: 4 | 6;
+		hsts: boolean;
+		sessionId: boolean;
+		// Proxy
 		proxy: ProxyProvider | null;
 		proxyAuthBasic: AuthBasic | null;
+		proxyAuthDigest: AuthBasic | null;
+		proxyAuthNtlm: AuthBasic | null;
 		proxyHeaders: ObjectStrData | null;
-		proxyHttpVersion: Exclude<HttpVersion, "0.9" | "2">;
+		proxyHttpVersion: Exclude<HttpVersion, "0.9" | "2" | "2-prior-knowledge"> | null;
 		/**
 		 * WARNING
 		 *
@@ -182,6 +206,25 @@ declare global {
 		 * `authBasic` property must be decrypt first and then parse into an object
 		*/
 		authBasic: string | null;
+		/**
+		 * ATTENTION
+		 *
+		 * `authDigest` property must be decrypt first and then parse into an object
+		*/
+		authDigest: string | null;
+		/**
+		 * ATTENTION
+		 *
+		 * `authNtlm` property must be decrypt first and then parse into an object
+		*/
+		authNtlm: string | null;
+		/**
+		 * ATTENTION
+		 *
+		 * `authAwsSigv4` property must be decrypt first and then parse into an object
+		*/
+		authAwsSigv4: string | null;
+		// 
 		executionDelay: number;
 		executeAt: number;
 		retry: number;
@@ -202,6 +245,11 @@ declare global {
 		estimateNextRetryAt: number;
 		timeout: number;
 		timeoutAt: number;
+		// 
+		location: number | null;
+		locationTrusted: string | null;
+		proto: string | null;
+		protoRedirect: string | null;
 		/**
 		 * ATTENTION
 		 *
@@ -231,12 +279,17 @@ declare global {
 		 * `resolve` property must be decrypt first and then parse into an array string
 		*/
 		resolve: string | null;
+		ipv: number;
+		hsts: number;
+		sessionId: number;
 		//
 		proxy: string | null;
 		proxyAuthBasic: string | null;
+		proxyAuthDigest: string | null;
+		proxyAuthNtlm: string | null;
 		proxyHeaders: string | null;
-		proxyHttpVersion: string;
-		proxyInsecure: number;
+		proxyHttpVersion: string | null;
+		proxyInsecure: number | null;
 	}
 
 	type FetchRes = {

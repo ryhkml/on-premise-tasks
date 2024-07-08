@@ -6,6 +6,7 @@ import { treaty } from "@elysiajs/eden";
 import { queue } from "./queue";
 import { subscriber } from "./subscriber";
 import { setPragma } from "../db";
+import { DEFAULT_CONFIG } from "../utils/http";
 
 const subscriberApi = treaty(subscriber().listen(+env.PORT! || 3200));
 const queueApp = queue().listen(+env.PORT! || 3200)
@@ -42,7 +43,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: 1
 				}
 			}, {
@@ -75,7 +76,7 @@ describe("Test API", () => {
 						method: "GET"
 					},
 					config: {
-						...queueApp.decorator.defaultConfig,
+						...DEFAULT_CONFIG,
 						executionDelay: 1
 					}
 				}, {
@@ -108,7 +109,7 @@ describe("Test API", () => {
 						method: "GET"
 					},
 					config: {
-						...queueApp.decorator.defaultConfig,
+						...DEFAULT_CONFIG,
 						executionDelay: 1
 					}
 				}, {
@@ -144,7 +145,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -177,7 +178,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -204,7 +205,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -235,7 +236,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executeAt
 				}
 			}, {
@@ -260,7 +261,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime,
 					retryAt
 				}
@@ -281,7 +282,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -300,7 +301,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime,
 					retry: 3,
 					retryInterval: 1,
@@ -334,7 +335,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -371,7 +372,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -429,7 +430,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -463,7 +464,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -499,7 +500,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {
@@ -536,7 +537,7 @@ describe("Test API", () => {
 					method: "GET"
 				},
 				config: {
-					...queueApp.decorator.defaultConfig,
+					...DEFAULT_CONFIG,
 					executionDelay: dueTime
 				}
 			}, {

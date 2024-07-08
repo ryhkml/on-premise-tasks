@@ -118,6 +118,22 @@ interface TasksHttp {
         user: string;
         password: string;
     };
+    authDigest?: {
+        user: string;
+        password: string;
+    };
+    authNtlm?: {
+        user: string;
+        password: string;
+    };
+    authAwsSigv4?: {
+		provider1: string;
+		provider2: string;
+		region: string;
+		service: string;
+		key: string;
+		secret: string;
+    };
 }
 
 interface TasksConfig {
@@ -134,33 +150,49 @@ interface TasksConfig {
     // The configuration below refers to the curl options (not all options are supported)
     // Visit https://curl.se/docs/manpage.html for more information
     //
-    dnsServer?: Array<string> | null;
-    dohInsecure?: boolean;
-    dohUrl?: string | null;
-    httpVersion?: "0.9" | "1.0" | "1.1" | "2";
-    insecure?: boolean;
-    refererUrl?: string | "AUTO" | null;
-    redirectAttempts?: number;
-    keepAliveDuration?: number;
+	location?: boolean; // Default false
+	locationTrusted?: {
+		user: string;
+		password: string;
+	} | null; // Default null
+    dnsServer?: Array<string> | null; // Default null
+    dohInsecure?: boolean; // Default false
+    dohUrl?: string | null; // Default null
+    httpVersion?: "0.9" | "1.0" | "1.1" | "2" | "2-prior-knowledge"; // Default "1.1"
+    insecure?: boolean; // Default false
+    refererUrl?: string | "AUTO" | null; // Default "AUTO"
+    redirectAttempts?: number; // Default 8
+    keepAliveDuration?: number; // Default 30, in seconds
     resolve?: Array<{
         host: string;
         port: number;
         address: Array<string>;
-    }> | null;
-    proxy: {
+    }> | null; // Default null
+	ipv?: 4 | 6; // Default 4
+	hsts?: boolean; // Default false
+	sessionId?: boolean; // Default true
+    proxy?: {
         protocol: "http" | "https";
         host: string;
         port?: number;
-    } | null;
-    proxyAuthBasic: {
+    } | null; // Default EMPTY
+    proxyAuthBasic?: {
         user: string;
         password: string;
-    } | null;
-    proxyHeaders: {
+    } | null; // Default EMPTY
+    proxyAuthDigest?: {
+        user: string;
+        password: string;
+    } | null; // Default EMPTY
+    proxyAuthNtlm?: {
+        user: string;
+        password: string;
+    } | null; // Default EMPTY
+    proxyHeaders?: {
         [key: string]: string;
-    } | null;
-    proxyHttpVersion: "1.0" | "1.1";
-    proxyInsecure: boolean;
+    } | null; // Default EMPTY
+    proxyHttpVersion?: "1.0" | "1.1"; // Default EMPTY
+    proxyInsecure?: boolean; // Default EMPTY
 }
 ```
 An example of requesting a Task
