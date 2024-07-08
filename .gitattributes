@@ -1,0 +1,2 @@
+src/nixpkgs/*.nix linguist-language=Nix
+src/sql/**/*.sql linguist-language=SQL
