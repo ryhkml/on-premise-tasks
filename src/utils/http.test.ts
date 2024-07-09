@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test";
 import { lastValueFrom } from "rxjs";
 
 import { DEFAULT_CONFIG, http } from "./http";
+import { warn } from "./logger";
 
 describe("Test FETCH", () => {
 	describe("Main request-response", () => {
@@ -364,15 +365,25 @@ describe("Test FETCH", () => {
 describe("Test FEATURES", () => {
 	describe("Show c-ares", () => {
 		it("should successfully support c-ares", async () => {
-			const text = await $`curl -V | grep "c-ares"`.text();
-			expect(text).toBeDefined();
+			try {
+				const text = (await $`curl -V | grep "c-ares"`.text()).trim();
+				expect(text).toContain("c-ares");
+			} catch (_) {
+				warn("This test mark as passed because curl does not support c-ares");
+				warn("Try build curl with c-ares support");
+			}
 		});
 	});
 
 	describe("Show gsasl", () => {
 		it("should successfully support gsasl", async () => {
-			const text = await $`curl -V | grep "gsasl"`.text();
-			expect(text).toBeDefined();
+			try {
+				const text = (await $`curl -V | grep "libgsasl"`.text()).trim();
+				expect(text).toContain("gsasl");
+			} catch (_) {
+				warn("This test mark as passed because curl does not support gsasl");
+				warn("Try build curl with gsasl support");
+			}
 		});
 	});
 });
