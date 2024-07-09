@@ -127,12 +127,12 @@ interface TasksHttp {
         password: string;
     };
     authAwsSigv4?: {
-		provider1: string;
-		provider2: string;
-		region: string;
-		service: string;
-		key: string;
-		secret: string;
+        provider1: string;
+        provider2: string;
+        region: string;
+        service: string;
+        key: string;
+        secret: string;
     };
 }
 

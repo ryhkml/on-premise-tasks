@@ -27,7 +27,7 @@ RUN cargo test --workspace && \
 	cargo build --release && \
 	cp ./target/release/libtar.so /usr/local/lib/ && \
 	bun install --production && \
-	mkdir db && \
+	mkdir .database && \
     bun run init-db.ts && \
     bun test --timeout 15000 && \
 	rm -rf ./db/* && \
@@ -62,7 +62,7 @@ WORKDIR /home/nonroot/app
 COPY --from=nix-store --chown=nonroot:nonroot /output/store /nix/store
 COPY --from=nix-store --chown=nonroot:nonroot /output/profile/ /usr/local/
 COPY --from=build --chown=nonroot:nonroot /build/tasks /usr/local/bin/
-COPY --from=build --chown=nonroot:nonroot /build/db /home/nonroot/app/db/
+COPY --from=build --chown=nonroot:nonroot /build/.database /home/nonroot/app/.database/
 COPY --from=build --chown=nonroot:nonroot /build/target/release/libtar.so /usr/local/lib/
 COPY --chown=nonroot:nonroot tls /home/nonroot/app/tls/
 

@@ -13,7 +13,7 @@ services:
     ports:
       - "127.0.0.1:${PORT}:${PORT}"
     volumes:
-      - db:/home/nonroot/app/db
+      - db:/home/nonroot/app/.database
     networks:
       - net
     env_file:

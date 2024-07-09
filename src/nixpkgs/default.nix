@@ -1,4 +1,4 @@
-with import <nixpkgs> {};
+with import <nixpkgs> { system = "x86_64-linux"; };
 
 let
     tasksCurl = pkgs.curl.override { 

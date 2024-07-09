@@ -1,11 +1,12 @@
-import { $, env, file, sleep, write } from "bun";
+import { env, file, sleep, write } from "bun";
 import { Database } from "bun:sqlite";
+import { unlink } from "node:fs/promises";
 
 import { setPragma } from "./src/db";
 import { info } from "./src/utils/logger";
+import { cwd } from "./src/utils/cwd";
 
 const initAt = Date.now();
-const delay = 2000;
 
 if (env.PATH_SQLITE == null) {
 	throw new Error("Path sqlite is empty");
@@ -14,12 +15,16 @@ if (env.PATH_SQLITE == null) {
 const isDbExists = await file(env.PATH_SQLITE).exists();
 
 if (isDbExists) {
-	$`rm -rf ${env.PATH_SQLITE}*`.then(() => {});
-	await sleep(delay);
+	await Promise.all([
+		unlink(cwd(env.PATH_SQLITE)),
+		unlink(cwd(env.PATH_SQLITE + "-shm")),
+		unlink(cwd(env.PATH_SQLITE + "-wal"))
+	]);
+	await sleep(1);
 }
 
 await write(env.PATH_SQLITE, "");
-await sleep(delay / 2);
+await sleep(1);
 
 const db = new Database(env.PATH_SQLITE, {
 	readwrite: true,

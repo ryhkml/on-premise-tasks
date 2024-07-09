@@ -1,68 +1,48 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
-/.pnp
+node_modules/
+.pnp
 .pnp.js
 
 # testing
-/coverage
+coverage/
 dummy.ts
 dummy-db.ts
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# Misc
 .DS_Store
 *.pem
 note.txt
 .env
 
+# Vscode
+!.vscode/
+.vscode/*
+!.vscode/settings.json
+
 # Output
-/target
+target
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+rest.http
 
 # local env files
 .env.development
 .env.production
 
-# vercel
-.vercel
-
-**/*.trace
-**/*.zip
-**/*.tar.gz
-**/*.tgz
-**/*.log
-package-lock.json
-**/*.bun
-
 # DB
-db/tasks.*
-db/test/tasks.*
-db/*.db*
-db/*.sqlite*
-db/test/*.db*
-db/test/*.sqlite*
+!.database/
+.database/*
+!.database/.gitkeep
 
 # Bin
 tasks
 
 # TLS/SSL
-tls/*.ca
-tls/*.crt
-tls/*.csr
-tls/*.cert
-tls/*.key
-tls/*.pem
-
-rest.http
+!tls/
+tls/*
+!tls/.gitkeep

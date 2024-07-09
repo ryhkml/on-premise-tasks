@@ -1,14 +1,13 @@
+.database/
 .vscode/
 
-**/.gitkeep
-
 node_modules/
-db/
 
 docker-compose*
 docker-podman-compose*
 cosign*
 
-note.txt
-
 .env.example
+
+**/.gitkeep
+**/*.log

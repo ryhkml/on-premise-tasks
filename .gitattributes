@@ -1,4 +1,2 @@
-*.nix linguist-language=Nix
-*.sql linguist-language=SQL
-
-*.test.ts linguist-documentation
+# Don't count tests in the language stats
+src/**/*.test.ts linguist-documentation
