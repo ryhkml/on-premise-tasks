@@ -30,7 +30,7 @@ RUN cargo test --workspace && \
 	mkdir .database && \
     bun run init-db.ts && \
     bun test --timeout 15000 && \
-	rm -rf ./db/* && \
+	rm -rf .database/* && \
     bun run init-db.ts && \
     bun build --compile --minify --sourcemap ./src/main.ts --outfile ./tasks
 
