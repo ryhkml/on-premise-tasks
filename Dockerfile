@@ -37,7 +37,10 @@ RUN cargo test --workspace && \
 # Nix store stage
 FROM nixos/nix AS nix-store
 
+ARG TAR
+
 ENV NIXPKGS_ALLOW_UNFREE=1
+ENV TAR=$TAR
 
 COPY src/nixpkgs/default.nix /tmp/default.nix
 

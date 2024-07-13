@@ -12,6 +12,7 @@ services:
     build:
       args:
         - PORT=${PORT}
+        - TAR=${TAR}
       context: .
       secrets:
         - env
