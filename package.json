@@ -15,7 +15,7 @@
 	"dependencies": {
 		"@elysiajs/cron": "^1.0.3",
 		"@elysiajs/eden": "^1.0.14",
-		"@google-cloud/storage": "^7.11.2",
+		"@google-cloud/storage": "^7.11.3",
 		"crypto-js": "^4.2.0",
 		"date-fns": "^3.6.0",
 		"elysia": "^1.0.27",
