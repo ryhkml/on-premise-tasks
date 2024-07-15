@@ -150,11 +150,11 @@ interface TasksConfig {
     // The configuration below refers to the curl options (not all options are supported)
     // Visit https://curl.se/docs/manpage.html for more information
     //
-	location?: boolean; // Default false
-	locationTrusted?: {
-		user: string;
-		password: string;
-	} | null; // Default null
+    location?: boolean; // Default false
+    locationTrusted?: {
+        user: string;
+        password: string;
+    } | null; // Default null
     dnsServer?: Array<string> | null; // Default null
     dohInsecure?: boolean; // Default false
     dohUrl?: string | null; // Default null
