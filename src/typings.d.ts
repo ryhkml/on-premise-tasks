@@ -64,6 +64,8 @@ declare global {
 
 	type HttpVersion = "0.9" | "1.0" | "1.1" | "2" | "2-prior-knowledge";
 
+	type TlsVersion = "1.0" | "1.1" | "1.2" | "1.3";
+
 	type ResolveProvider = {
 		host: string;
 		port: number;
@@ -86,6 +88,8 @@ declare global {
 		retryExponential: boolean;
 		timeout: number;
 		timeoutAt: number;
+		// CA
+		ca: string[] | null,
 		// Redirections
 		location: boolean;
 		locationTrusted: AuthBasic | null;
@@ -118,6 +122,11 @@ declare global {
 		ipv: 4 | 6;
 		hsts: boolean;
 		sessionId: boolean;
+		tlsVersion: TlsVersion | null;
+		tlsMaxVersion: TlsVersion | null;
+		// HaProxy
+		haProxyClientIp: string | null;
+		haProxyProtocol: boolean | null;
 		// Proxy
 		proxy: ProxyProvider | null;
 		proxyAuthBasic: AuthBasic | null;
@@ -246,6 +255,8 @@ declare global {
 		timeout: number;
 		timeoutAt: number;
 		// 
+		ca: string | null;
+		// 
 		location: number | null;
 		locationTrusted: string | null;
 		proto: string | null;
@@ -282,6 +293,11 @@ declare global {
 		ipv: number;
 		hsts: number;
 		sessionId: number;
+		tlsVersion: string | null;
+		tlsMaxVersion: string | null;
+		// 
+		haProxyClientIp: string | null;
+		haProxyProtocol: number | null;
 		//
 		proxy: string | null;
 		proxyAuthBasic: string | null;
@@ -293,6 +309,10 @@ declare global {
 	}
 
 	type FetchRes = {
+		/**
+		 * This id is an http response identifier. Not a queue id
+		*/
+		id: string;
 		data: Buffer | null;
 		state: Exclude<TaskState, "PAUSED" | "RUNNING">;
 		status: number;

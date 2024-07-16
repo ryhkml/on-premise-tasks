@@ -1,10 +1,13 @@
-import { readableStreamToText, spawn } from "bun";
+import { readableStreamToText, spawn, write } from "bun";
+
+import { randomBytes } from "node:crypto";
 
 import { TimeoutError, catchError, defer, map, throwError, timeout } from "rxjs";
 import { isArray, isPlainObject, toSafeInteger, toString } from "lodash";
 import { nanoid } from "nanoid";
 
 export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: string }) {
+	const id = randomBytes(32).toString("hex");
 	const options = ["-s"];
 	// Method
 	if (req.httpRequest.method) {
@@ -20,6 +23,25 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 	} else {
 		options.push("--proto");
 		options.push("-all,http,https");
+	}
+	// CA
+	if (req.config.ca) {
+		if (req.config.ca.length == 1) {
+			const dataCa = Buffer.from(req.config.ca[0], "base64").toString("utf-8");
+			const pathCa = "/tmp/" + id + "/ca/ca.crt";
+			write(pathCa, dataCa, { mode: 440 });
+			options.push("--cacert");
+			options.push(pathCa);
+		} else {
+			for (let i = 0; i < req.config.ca.length; i++) {
+				const name = "ca-" + (i + 1).toString() + ".crt";
+				const dataCa = Buffer.from(req.config.ca[i], "base64").toString("utf-8");
+				const pathCa = "/tmp/" + id + "/cas/" + name;
+				write(pathCa, dataCa, { mode: 440 });
+			}
+			options.push("--capath");
+			options.push("/tmp/" + id + "/cas");
+		}
 	}
 	// Location
 	if (req.config.location) {
@@ -46,6 +68,33 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push("--location-trusted");
 			options.push("-u");
 			options.push(user + ":" + password);
+		}
+	}
+	// TLS version
+	if (req.config.tlsMaxVersion) {
+		if (req.config.tlsMaxVersion == "1.0") {
+			options.push("--tls-max");
+			options.push("1.0");
+		} else if (req.config.tlsMaxVersion == "1.1") {
+			options.push("--tls-max");
+			options.push("1.1");
+		} else if (req.config.tlsMaxVersion == "1.2") {
+			options.push("--tls-max");
+			options.push("1.2");
+		} else if (req.config.tlsMaxVersion == "1.3") {
+			options.push("--tls-max");
+			options.push("1.3");
+		}
+	}
+	if (req.config.tlsVersion) {
+		if (req.config.tlsVersion == "1.0") {
+			options.push("--tlsv1.0");
+		} else if (req.config.tlsVersion == "1.1") {
+			options.push("--tlsv1.1");
+		} else if (req.config.tlsVersion == "1.2") {
+			options.push("--tlsv1.2");
+		} else if (req.config.tlsVersion == "1.3") {
+			options.push("--tlsv1.3");
 		}
 	}
 	// HTTP basic authentication
@@ -212,6 +261,14 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 	if (!req.config.sessionId) {
 		options.push("--no-sessionid");
 	}
+	// HaProxy
+	if (req.config.haProxyClientIp) {
+		options.push("--haproxy-clientip");
+		options.push(req.config.haProxyClientIp);
+	}
+	if (req.config.haProxyProtocol) {
+		options.push("--haproxy-protocol");
+	}
 	// Proxy
 	if (req.config.proxy) {
 		if (req.config.proxyHttpVersion == "1.0") {
@@ -272,6 +329,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			const sizes = toSafeInteger(sizeData) + toSafeInteger(sizeHeader);
 			if (sizes > 32768) {
 				throw {
+					id,
 					data: Buffer.from("The response size cannot be more than 32kb"),
 					state: "ERROR",
 					status: 500,
@@ -280,6 +338,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			}
 			if (status >= 400 && status <= 599) {
 				throw {
+					id,
 					data: Buffer.from(payload),
 					state: "ERROR",
 					status,
@@ -287,6 +346,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 				};
 			}
 			return {
+				id,
 				data: Buffer.from(payload),
 				state: "DONE",
 				status,
@@ -306,6 +366,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 				}
 				if ("info" in error) {
 					return throwError(() => ({
+						id,
 						data: Buffer.from(toString(error.info.stderr)),
 						state: "ERROR",
 						status: 501,
@@ -315,6 +376,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			}
 			if (error instanceof TimeoutError) {
 				return throwError(() => ({
+					id,
 					data: Buffer.from(toString(error)),
 					state: "ERROR",
 					status: 408,
@@ -322,6 +384,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 				}));
 			}
 			return throwError(() => ({
+				id,
 				data: Buffer.from(toString(error)),
 				state: "ERROR",
 				status: 500,
@@ -346,6 +409,7 @@ export const DEFAULT_CONFIG: TaskConfig = {
 	retryExponential: true,
 	timeout: 30000,
 	timeoutAt: 0,
+	ca: null,
 	location: false,
 	locationTrusted: null,
 	proto: null,
@@ -362,6 +426,10 @@ export const DEFAULT_CONFIG: TaskConfig = {
 	ipv: 4,
 	hsts: false,
 	sessionId: true,
+	tlsVersion: null,
+	tlsMaxVersion: null,
+	haProxyClientIp: null,
+	haProxyProtocol: null,
 	proxy: null,
 	proxyAuthBasic: null,
 	proxyAuthDigest: null,

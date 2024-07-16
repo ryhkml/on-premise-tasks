@@ -13,7 +13,7 @@
 </div>
 
 ## Features
-1. HTTP request
+1. HTTP request with curl options (not all options)
 2. Retry mechanism
 3. Scheduling
 
@@ -150,6 +150,7 @@ interface TasksConfig {
     // The configuration below refers to the curl options (not all options are supported)
     // Visit https://curl.se/docs/manpage.html for more information
     //
+    ca?: Array<string base64> | null;
     location?: boolean; // Default false
     locationTrusted?: {
         user: string;
@@ -171,6 +172,10 @@ interface TasksConfig {
 	ipv?: 4 | 6; // Default 4
 	hsts?: boolean; // Default false
 	sessionId?: boolean; // Default true
+    tlsVersion?: "1.0" | "1.1" | "1.2" | "1.3";
+    tlsMaxVersion?: "1.0" | "1.1" | "1.2" | "1.3";
+    haProxyClientIp?: string | null;
+    haProxyProtocol?: boolean | null;
     proxy?: {
         protocol: "http" | "https";
         host: string;

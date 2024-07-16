@@ -1,13 +1,15 @@
 import { env } from "bun";
 import { Database } from "bun:sqlite";
 
+import { rmSync } from "node:fs";
+
 import { randomBytes } from "node:crypto";
 
 import { Elysia, t } from "elysia";
 import { cron, Patterns } from "@elysiajs/cron";
 
 import { addMilliseconds, differenceInMilliseconds, isAfter, isBefore, millisecondsToSeconds } from "date-fns";
-import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, throwError, timer } from "rxjs";
+import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, tap, throwError, timer } from "rxjs";
 import { isPlainObject, kebabCase, toSafeInteger, toString } from "lodash";
 
 import { DEFAULT_CONFIG, http } from "../utils/http";
@@ -628,6 +630,16 @@ export function queue() {
 						minimum: 0,
 						maximum: Number.MAX_SAFE_INTEGER
 					}),
+					ca: t.Union([
+						t.Array(t.String({ contentEncoding: "base64" }), {
+							minItems: 1,
+							maxItems: 32,
+							uniqueItems: true
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
 					location: t.Boolean({
 						default: false
 					}),
@@ -792,6 +804,41 @@ export function queue() {
 					}),
 					sessionId: t.Boolean({
 						default: true
+					}),
+					tlsVersion: t.Union([
+						t.Literal("1.0"),
+						t.Literal("1.1"),
+						t.Literal("1.2"),
+						t.Literal("1.3"),
+						t.Null()
+					], {
+						default: null
+					}),
+					tlsMaxVersion: t.Union([
+						t.Literal("1.0"),
+						t.Literal("1.1"),
+						t.Literal("1.2"),
+						t.Literal("1.3"),
+						t.Null()
+					], {
+						default: null
+					}),
+					haProxyClientIp: t.Union([
+						t.String({
+							format: "ipv4"
+						}),
+						t.String({
+							format: "ipv6"
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					haProxyProtocol: t.Union([
+						t.Boolean(),
+						t.Null()
+					], {
+						default: null
 					}),
 					proxy: t.Union([
 						t.Object({
@@ -1022,6 +1069,7 @@ type SubscriptionContext = {
 }
 
 function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queueId: string) {
+	let resId = "";
 	const log = toSafeInteger(env.LOG) == 1;
 	const stmtQ = ctx.db.prepare<void, [string, number, Buffer, number, string]>("UPDATE queue SET state = ?1, statusCode = ?2, finalize = ?3, estimateEndAt = ?4 WHERE id = ?5 AND subscriberId IN (SELECT id FROM subscriber);");
 	const stmtC = ctx.db.prepare<Pick<ConfigTable, "retryCount" | "retryLimit">, string>("UPDATE config SET retrying = 1 WHERE id = ? AND id IN (SELECT id FROM queue) RETURNING retryCount, retryLimit;");
@@ -1034,7 +1082,11 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 				let additionalHeaders = {} as { [k: string]: string };
 				let stateMs = 0;
 				return defer(() => http(ctx.body, additionalHeaders)).pipe(
+					tap({
+						next: ({ id }) => resId = id
+					}),
 					catchError((error: FetchRes) => {
+						resId = error.id;
 						const someErrorStatusCode = ctx.body.config.retryStatusCode.some(statusCode => statusCode == error.status);
 						if (ctx.body.config.retryStatusCode.length == 0 || someErrorStatusCode) {
 							return throwError(() => error);
@@ -1115,6 +1167,14 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 				if (log) {
 					console.error();
 					console.error("ERROR", err);
+				}
+			},
+			complete() {
+				if (ctx.body.config.ca && resId) {
+					rmSync("/tmp/" + resId, {
+						recursive: true,
+						force: true
+					});
 				}
 			}
 		})
@@ -1219,6 +1279,12 @@ function registerQueue(ctx: SubscriptionContext) {
 		raw += " proto = ?,";
 		rawBindings.push(ctx.body.config.proto);
 	}
+	if (ctx.body.config.ca) {
+		raw += " ca = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.ca), key)
+		);
+	}
 	if (ctx.body.config.location) {
 		raw += " location = 1,";
 		if (ctx.body.config.redirectAttempts != 8) {
@@ -1281,6 +1347,23 @@ function registerQueue(ctx: SubscriptionContext) {
 	}
 	if (!ctx.body.config.sessionId) {
 		raw += " sessionId = 0,";
+	}
+	if (ctx.body.config.tlsMaxVersion) {
+		raw += " tlsMaxVersion = ?,";
+		rawBindings.push(ctx.body.config.tlsMaxVersion);
+	}
+	if (ctx.body.config.tlsVersion) {
+		raw += " tlsVersion = ?,";
+		rawBindings.push(ctx.body.config.tlsVersion);
+	}
+	if (ctx.body.config.haProxyClientIp) {
+		raw += " haProxyClientIp = ?,";
+		rawBindings.push(
+			encr(ctx.body.config.haProxyClientIp, key)
+		);
+	}
+	if (ctx.body.config.haProxyProtocol) {
+		raw += " haProxyProtocol = 1,";
 	}
 	if (ctx.body.config.proxy) {
 		raw += " proxy = ?,";
@@ -1434,6 +1517,9 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			retryExponential: !!rq.retryExponential,
 			timeout: rq.timeout,
 			timeoutAt: rq.timeoutAt,
+			ca: !!rq.ca
+				? JSON.parse(decr(rq.ca, key))
+				: null,
 			location: !!rq.location,
 			locationTrusted: !!rq.locationTrusted
 				? JSON.parse(decr(rq.locationTrusted, key))
@@ -1460,6 +1546,12 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			ipv: rq.ipv,
 			hsts: !!rq.hsts,
 			sessionId: !!rq.sessionId,
+			tlsVersion: rq.tlsVersion,
+			tlsMaxVersion: rq.tlsMaxVersion,
+			haProxyClientIp: !!rq.haProxyClientIp
+				? decr(rq.haProxyClientIp, key)
+				: null,
+			haProxyProtocol: !!rq.haProxyProtocol,
 			proxy: !!rq.proxy
 				? JSON.parse(decr(rq.proxy, key))
 				: null,
