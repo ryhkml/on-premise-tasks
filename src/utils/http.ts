@@ -3,8 +3,7 @@ import { readableStreamToText, spawn, write } from "bun";
 import { randomBytes } from "node:crypto";
 
 import { TimeoutError, catchError, defer, map, throwError, timeout } from "rxjs";
-import { isArray, isPlainObject, toSafeInteger, toString } from "lodash";
-import { nanoid } from "nanoid";
+import { isArray, isPlainObject, isString, toSafeInteger, toString } from "lodash";
 
 export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: string }) {
 	const id = randomBytes(32).toString("hex");
@@ -15,7 +14,7 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 		options.push(req.httpRequest.method);
 	}
 	// IP. Use IP addresses only when resolving hostnames
-	options.push("-" + req.config.ipv.toString());
+	options.push("-" + req.config.ipVersion.toString());
 	// Proto. By default, proto only enables http and https
 	if (req.config.proto) {
 		options.push("--proto");
@@ -255,7 +254,14 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 	// HSTS
 	if (req.config.hsts) {
 		options.push("--hsts");
-		options.push("/tmp/app/" + nanoid(16) + ".txt");
+		if (isString(req.config.hsts)) {
+			const dataHsts = Buffer.from(req.config.hsts, "base64").toString("utf-8");
+			const pathHsts = "/tmp/" + id + "/hsts/hsts.txt";
+			write(pathHsts, dataHsts, { mode: 440 });
+			options.push(pathHsts);
+		} else {
+			options.push("/dev/null");
+		}
 	}
 	// Session id
 	if (!req.config.sessionId) {
@@ -423,8 +429,8 @@ export const DEFAULT_CONFIG: TaskConfig = {
 	redirectAttempts: 8,
 	refererUrl: null,
 	resolve: null,
-	ipv: 4,
-	hsts: false,
+	ipVersion: 4,
+	hsts: null,
 	sessionId: true,
 	tlsVersion: null,
 	tlsMaxVersion: null,

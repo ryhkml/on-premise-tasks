@@ -10,7 +10,7 @@ import { cron, Patterns } from "@elysiajs/cron";
 
 import { addMilliseconds, differenceInMilliseconds, isAfter, isBefore, millisecondsToSeconds } from "date-fns";
 import { BehaviorSubject, catchError, defer, delay, filter, finalize, map, mergeMap, of, retry, switchMap, tap, throwError, timer } from "rxjs";
-import { isPlainObject, kebabCase, toSafeInteger, toString } from "lodash";
+import { isPlainObject, isString, kebabCase, toSafeInteger, toString } from "lodash";
 
 import { DEFAULT_CONFIG, http } from "../utils/http";
 import { pluginAuth } from "../plugins/auth";
@@ -793,14 +793,18 @@ export function queue() {
 					], {
 						default: null
 					}),
-					ipv: t.Union([
+					ipVersion: t.Union([
 						t.Literal(4),
 						t.Literal(6)
 					], {
 						default: 4
 					}),
-					hsts: t.Boolean({
-						default: false
+					hsts: t.Union([
+						t.String({ contentEncoding: "base64" }),
+						t.Boolean(),
+						t.Null()
+					], {
+						default: null
 					}),
 					sessionId: t.Boolean({
 						default: true
@@ -1340,10 +1344,17 @@ function registerQueue(ctx: SubscriptionContext) {
 			encr(JSON.stringify(ctx.body.config.resolve), key)
 		);
 	}
-	raw += " ipv = ?,";
-	rawBindings.push(ctx.body.config.ipv);
+	raw += " ipVersion = ?,";
+	rawBindings.push(ctx.body.config.ipVersion);
 	if (ctx.body.config.hsts) {
-		raw += " hsts = 1,";
+		if (isString(ctx.body.config.hsts)) {
+			raw += " hsts = ?,";
+			rawBindings.push(
+				encr(JSON.stringify(ctx.body.config.hsts), key)
+			);
+		} else {
+			raw += " hsts = 1,";
+		}
 	}
 	if (!ctx.body.config.sessionId) {
 		raw += " sessionId = 0,";
@@ -1543,8 +1554,12 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			resolve: !!rq.resolve
 				? JSON.parse(decr(rq.resolve, key))
 				: null,
-			ipv: rq.ipv,
-			hsts: !!rq.hsts,
+			ipVersion: rq.ipVersion,
+			hsts: !!rq.hsts
+				? (rq.hsts == "1" || null)
+				: !!rq.hsts && rq.hsts != "1"
+					? JSON.parse(decr(rq.hsts, key))
+					: null,
 			sessionId: !!rq.sessionId,
 			tlsVersion: rq.tlsVersion,
 			tlsMaxVersion: rq.tlsMaxVersion,

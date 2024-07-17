@@ -296,11 +296,11 @@ describe("Test FETCH", () => {
 				config: {
 					...DEFAULT_CONFIG,
 					timeout: 6000,
-					ipv: 6
+					ipVersion: 6
 				}
 			})
 		);
-		it.skipIf(result.status == 0)("should successfully use IPv6", async () => {
+		it.skipIf(result.status == 0)("should successfully use IPv6", () => {
 			expect(result.status).toBeGreaterThanOrEqual(200);
 			expect(result.status).toBeLessThanOrEqual(299);
 		});
@@ -340,7 +340,7 @@ describe("Test FETCH", () => {
 				}
 			})
 		);
-		it.skipIf(result.status == 0)("should successfully add HSTS", async () => {
+		it.skipIf(result.status == 0)("should successfully add HSTS", () => {
 			expect(result.status).toBeGreaterThanOrEqual(200);
 			expect(result.status).toBeLessThanOrEqual(299);
 		});
@@ -360,7 +360,27 @@ describe("Test FETCH", () => {
 				}
 			})
 		);
-		it.skipIf(result.status == 0)("should successfully use HTTP/2", async () => {
+		it.skipIf(result.status == 0)("should successfully use HTTP/2", () => {
+			expect(result.status).toBeGreaterThanOrEqual(200);
+			expect(result.status).toBeLessThanOrEqual(299);
+		});
+	});
+
+	describe("GET request", async () => {
+		const result = await lastValueFrom(
+			http({
+				httpRequest: {
+					url: "https://us-central1-adroit-cortex-391921.cloudfunctions.net/on-premise-tasks-wht/cb",
+					method: "GET"
+				},
+				config: {
+					...DEFAULT_CONFIG,
+					timeout: 6000,
+					httpVersion: "2-prior-knowledge"
+				}
+			})
+		);
+		it.skipIf(result.status == 0)("should successfully use HTTP/2 Prior-Knowledge", () => {
 			expect(result.status).toBeGreaterThanOrEqual(200);
 			expect(result.status).toBeLessThanOrEqual(299);
 		});

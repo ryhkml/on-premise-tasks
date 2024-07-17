@@ -119,8 +119,8 @@ declare global {
 		refererUrl: string | "AUTO" | null;
 		keepAliveDuration: number;
 		resolve: Array<ResolveProvider> | null;
-		ipv: 4 | 6;
-		hsts: boolean;
+		ipVersion: 4 | 6;
+		hsts: string | boolean | null;
 		sessionId: boolean;
 		tlsVersion: TlsVersion | null;
 		tlsMaxVersion: TlsVersion | null;
@@ -290,8 +290,8 @@ declare global {
 		 * `resolve` property must be decrypt first and then parse into an array string
 		*/
 		resolve: string | null;
-		ipv: number;
-		hsts: number;
+		ipVersion: number;
+		hsts: string | null;
 		sessionId: number;
 		tlsVersion: string | null;
 		tlsMaxVersion: string | null;
