@@ -151,27 +151,36 @@ interface TasksConfig {
     // Visit https://curl.se/docs/manpage.html for more information
     //
     ca?: Array<string base64> | null;
+    cert?: {
+        value: string base64;
+        password?: string;
+    } | null;
+    certType?: "DER" | "ENG" | "P12" | "PEM" | null; // If not specified, PEM is assumed
+    certStatus?: boolean | null;
+    key?: string base64 | null;
+    keyType?: "DER" | "ENG" | "PEM" | null; // If not specified, PEM is assumed
+    // Redirection
     location?: boolean; // Default false
     locationTrusted?: {
         user: string;
         password: string;
     } | null; // Default null
+    redirectAttempts?: number; // Default 8
     dnsServer?: Array<string> | null; // Default null
     dohInsecure?: boolean; // Default false
     dohUrl?: string | null; // Default null
     httpVersion?: "0.9" | "1.0" | "1.1" | "2" | "2-prior-knowledge"; // Default "1.1"
     insecure?: boolean; // Default false
     refererUrl?: string | "AUTO" | null; // Default "AUTO"
-    redirectAttempts?: number; // Default 8
     keepAliveDuration?: number; // Default 30, in seconds
     resolve?: Array<{
         host: string;
         port: number;
         address: Array<string>;
     }> | null; // Default null
-	ipv?: 4 | 6; // Default 4
-	hsts?: boolean; // Default false
-	sessionId?: boolean; // Default true
+    ipv?: 4 | 6; // Default 4
+    hsts?: boolean; // Default false
+    sessionId?: boolean; // Default true
     tlsVersion?: "1.0" | "1.1" | "1.2" | "1.3";
     tlsMaxVersion?: "1.0" | "1.1" | "1.2" | "1.3";
     haProxyClientIp?: string | null;
@@ -200,7 +209,11 @@ interface TasksConfig {
     proxyInsecure?: boolean; // Default EMPTY
 }
 ```
-An example of requesting a Task
+To make it base64 content encoding, you can use the shell command
+```sh
+cat cert.pem | base64 -w 0
+```
+An example of requesting a task
 ```json
 {
     "httpRequest": {
@@ -260,7 +273,7 @@ Please note that properties ending with `"At"` are in UNIX time format:
 - `retryAt`
 - `timeoutAt`
 
-Attention:
+**Attention:**
 - `retryAt` is the same as `retry = 1` with a specific time
 - `timeoutAt` will be executed only once. If the task has been retried several times, then it will continue using `timeout`.
 

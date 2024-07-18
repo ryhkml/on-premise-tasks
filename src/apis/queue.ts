@@ -640,6 +640,50 @@ export function queue() {
 					], {
 						default: null
 					}),
+					cert: t.Union([
+						t.Object({
+							value: t.String({ contentEncoding: "base64" }),
+							password: t.Optional(t.String({
+								minLength: 1,
+								maxLength: Number.MAX_SAFE_INTEGER
+							}))
+						}, {
+							minProperties: 1,
+							maxProperties: 2
+						}),
+						t.Null()
+					], {
+						default: null
+					}),
+					certType: t.Union([
+						t.Literal("DER"),
+						t.Literal("ENG"),
+						t.Literal("P12"),
+						t.Literal("PEM"),
+						t.Null()
+					], {
+						default: null
+					}),
+					certStatus: t.Union([
+						t.Boolean(),
+						t.Null()
+					], {
+						default: null
+					}),
+					key: t.Union([
+						t.String({ contentEncoding: "base64" }),
+						t.Null()
+					], {
+						default: null
+					}),
+					keyType: t.Union([
+						t.Literal("DER"),
+						t.Literal("ENG"),
+						t.Literal("PEM"),
+						t.Null()
+					], {
+						default: null
+					}),
 					location: t.Boolean({
 						default: false
 					}),
@@ -1174,12 +1218,10 @@ function pushSubscription(ctx: SubscriptionContext, dueTime: number | Date, queu
 				}
 			},
 			complete() {
-				if (ctx.body.config.ca && resId) {
-					rmSync("/tmp/" + resId, {
-						recursive: true,
-						force: true
-					});
-				}
+				rmSync("/tmp/" + resId, {
+					recursive: true,
+					force: true
+				});
 			}
 		})
 	});
@@ -1288,6 +1330,33 @@ function registerQueue(ctx: SubscriptionContext) {
 		rawBindings.push(
 			encr(JSON.stringify(ctx.body.config.ca), key)
 		);
+	}
+	if (ctx.body.config.cert?.value) {
+		raw += " cert = ?,";
+		rawBindings.push(
+			encr(JSON.stringify(ctx.body.config.cert), key)
+		);
+		if (ctx.body.config.certType) {
+			raw += " certType = ?,";
+			rawBindings.push(
+				encr(ctx.body.config.certType, key)
+			);
+		}
+	}
+	if (ctx.body.config.certStatus) {
+		raw += " certStatus = 1,";
+	}
+	if (ctx.body.config.key) {
+		raw += " key = ?,";
+		rawBindings.push(
+			encr(ctx.body.config.key, key)
+		);
+		if (ctx.body.config.keyType) {
+			raw += " keyType = ?,";
+			rawBindings.push(
+				encr(ctx.body.config.keyType, key)
+			);
+		}
 	}
 	if (ctx.body.config.location) {
 		raw += " location = 1,";
@@ -1530,6 +1599,19 @@ function transformQueue(db: Database, rq: ResumeQueueQuery, beforeAt: number, te
 			timeoutAt: rq.timeoutAt,
 			ca: !!rq.ca
 				? JSON.parse(decr(rq.ca, key))
+				: null,
+			cert: !!rq.cert
+				? JSON.parse(decr(rq.cert, key))
+				: null,
+			certType: !!rq.certType
+				? decr(rq.certType, key)
+				: null,
+			certStatus: !!rq.certStatus,
+			key: !!rq.key
+				? decr(rq.key, key)
+				: null,
+			keyType: !!rq.keyType
+				? decr(rq.keyType, key)
 				: null,
 			location: !!rq.location,
 			locationTrusted: !!rq.locationTrusted

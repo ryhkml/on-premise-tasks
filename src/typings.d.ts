@@ -16,16 +16,13 @@ declare global {
 	type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 	type PlainTextData = string;
-
 	type MultipartFormData = {
 		name: string;
 		value: string;
 	}
-
 	type ApplicationJsonData = {
 		[k: string]: SafeAny;
 	}
-
 	type ObjectStrData = {
 		[k: string]: string;
 	}
@@ -38,8 +35,7 @@ declare global {
 	type AuthBasic = {
 		user: string;
 		password: string;
-	};
-
+	}
 	type AuthAwsSigv4 = {
 		provider1: string;
 		provider2: string;
@@ -48,6 +44,13 @@ declare global {
 		key: string;
 		secret: string;
 	}
+
+	type Certificate = {
+		value: string;
+		password?: string;
+	}
+	type CertificateType = "DER" | "ENG" | "P12" | "PEM";
+	type CertificateKeyType = Exclude<CertificateType, "P12">;
 
 	interface TaskHttp {
 		url: string;
@@ -88,8 +91,13 @@ declare global {
 		retryExponential: boolean;
 		timeout: number;
 		timeoutAt: number;
-		// CA
-		ca: string[] | null,
+		// CAs
+		ca: string[] | null;
+		cert: Certificate | null;
+		certType: CertificateType | null;
+		certStatus: boolean | null;
+		key: string | null;
+		keyType: CertificateKeyType | null;
 		// Redirections
 		location: boolean;
 		locationTrusted: AuthBasic | null;
@@ -256,6 +264,16 @@ declare global {
 		timeoutAt: number;
 		// 
 		ca: string | null;
+		/**
+		 * ATTENTION
+		 *
+		 * `cert` property must be decrypt first and then parse into an object
+		*/
+		cert: string | null;
+		certType: string | null;
+		certStatus: number;
+		key: string | null;
+		keyType: string | null;
 		// 
 		location: number | null;
 		locationTrusted: string | null;

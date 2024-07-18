@@ -42,6 +42,42 @@ export function http(req: TaskSubscriberReq, additionalHeaders?: { [k: string]: 
 			options.push("/tmp/" + id + "/cas");
 		}
 	}
+	// Cert
+	if (req.config.cert?.value) {
+		const type = req.config.certType?.toLowerCase() || "pem";
+		const dataCert = Buffer.from(req.config.cert.value, "base64").toString("utf-8");
+		const pathCert = "/tmp/" + id + "/cert/cert." + type;
+		write(pathCert, dataCert, { mode: 440 });
+		if (req.config.certType) {
+			options.push("--cert-type");
+			options.push(req.config.certType);
+		}
+		options.push("--cert");
+		if (req.config.cert.password) {
+			const password = req.config.cert.password
+				.replace(/:/g, "\\:")
+				.replace(/"/g, '\\"');
+			options.push(pathCert + ":" + password);
+		} else {
+			options.push(pathCert);
+		}
+	}
+	if (req.config.certStatus) {
+		options.push("--cert-status");
+	}
+	// Key
+	if (req.config.key) {
+		const type = req.config.keyType?.toLowerCase() || "pem";
+		const dataKey = Buffer.from(req.config.key, "base64").toString("utf-8");
+		const pathKey = "/tmp/" + id + "/cert/key." + type;
+		write(pathKey, dataKey, { mode: 440 });
+		if (req.config.keyType) {
+			options.push("--key-type");
+			options.push(req.config.keyType);
+		}
+		options.push("--key");
+		options.push(pathKey);
+	}
 	// Location
 	if (req.config.location) {
 		options.push("-L");
@@ -416,6 +452,11 @@ export const DEFAULT_CONFIG: TaskConfig = {
 	timeout: 30000,
 	timeoutAt: 0,
 	ca: null,
+	cert: null,
+	certType: null,
+	certStatus: null,
+	key: null,
+	keyType: null,
 	location: false,
 	locationTrusted: null,
 	proto: null,
