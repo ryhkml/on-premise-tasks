@@ -4,7 +4,7 @@
     </h1>
 </div>
 
-**On-Premise Tasks** is a managed service that handles the execution and distribution of tasks. A task is essentially an object that signifies a resource meant for one-time use. You can request tasks from **On-Premise Tasks**, and they will be carried out at a later time.
+**On-Premise Tasks** is a managed service designed to execute and distribute tasks. A task is essentially an object representing a resource intended for one-time use. You can request tasks from **On-Premise Tasks**, and they will be executed at a later time. A queue can be thought of as a bucket with certain limitations. By default, the maximum number of tasks that can be placed in the queue is 1000.
 
 <br>
 
@@ -13,9 +13,35 @@
 </div>
 
 ## Features
-1. HTTP request with curl options (not all options)
-2. Retry mechanism
-3. Scheduling
+1. HTTP requests with selected (http and https) curl options
+2. Configurable retry mechanism
+3. Custom scheduling options
+
+There are two comparison tables that compare Pub/Sub and the Cron Job Scheduler.
+
+### On-Premise Tasks vs Pub/Sub
+
+| **Feature** | **Tasks** | **Pub/Sub** |
+|---|---|---|
+| **Communication Model** | Message-to-queue | Publish-subscribe |
+| **Scheduling** | Yes (one-time or recurring) | No |
+| **Configurable Retries** | Yes | Yes |
+| **Individual Task Management** | Yes | No |
+| **Delivery Warranty** | Best (with retries) | At least once |
+| **Delivery Rate Control** | Limited 1000 task in queue | Unlimited |
+| **Use Cases** | Form submission, file processing, send notifications | Streaming data, asynchronous event processing |
+
+### On-Premise Tasks vs Cron Job Scheduler
+
+| **Feature** | **Tasks** | **Cron Job Scheduler** |
+|---|---|---|
+| **Communication Model** | Message-to-queue | Message-to-job |
+| **Scheduling** | Yes (one-time or recurring) | Yes (Cron-schedule fixed interval) |
+| **Configurable Retries** | Yes | No |
+| **Individual Task Management** | Yes | No |
+| **Delivery Warranty** | Best (with retries) | No |
+| **Delivery Rate Control** | Limited 1000 task in queue | No |
+| **Use Cases** | Form submission, file processing, send notifications | Batch processing, cleanup processing, data synchronization |
 
 ## Getting Started
 Make sure you have [bun](https://bun.sh/docs/installation) and [rust](https://www.rust-lang.org/tools/install) installed, then run:
@@ -178,7 +204,7 @@ interface TasksConfig {
         port: number;
         address: Array<string>;
     }> | null; // Default null
-    ipv?: 4 | 6; // Default 4
+    ipVersion?: 4 | 6; // Default 4
     hsts?: boolean; // Default false
     sessionId?: boolean; // Default true
     tlsVersion?: "1.0" | "1.1" | "1.2" | "1.3";
